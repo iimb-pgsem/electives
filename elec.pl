@@ -1,11 +1,11 @@
 #!/usr/bin/perl -w
 
+# $Id: elec.pl,v 1.2 2006/01/25 18:59:04 a14562 Exp $
+
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
-
-# Version 0.02
 
 # This program reads three files 
 # 
