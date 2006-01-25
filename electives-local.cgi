@@ -1,5 +1,12 @@
 #!perl -w
 
+# $Id: electives-local.cgi,v 1.2 2006/01/25 19:08:56 a14562 Exp $
+
+# Copyright (c) 2006
+# Sankaranarayanan K V <kvsankar@gmail.com>
+# Abhay Ghaisas <abhay.ghaisas@gmail.com>
+# All rights reserved.
+
 use strict;
 
 use CGI qw(:standard);

@@ -1,5 +1,7 @@
 #!perl -w
 
+# $Id: sendmail.cgi,v 1.2 2006/01/25 19:08:56 a14562 Exp $
+
 use strict;
 
 use CGI qw(:standard);
