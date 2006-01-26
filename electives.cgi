@@ -1,5 +1,12 @@
 #!/usr/bin/perl -w
 
+# $Id: electives.cgi,v 1.3 2006/01/26 09:18:14 a14562 Exp $
+
+# Copyright (c) 2006
+# Sankaranarayanan K V <kvsankar@gmail.com>
+# Abhay Ghaisas <abhay.ghaisas@gmail.com>
+# All rights reserved.
+
 use strict;
 
 use CGI qw(:standard);
@@ -14,8 +21,8 @@ use POSIX qw(strftime);
 my $login = '';
 my $password = '';
 my $datasource = "DBI:mysql:sankara_q42005";
-my $dblogin = 'sankara_sankar';
-my $dbpassword = 'sankar123';
+my $dblogin = '';
+my $dbpassword = '';
 # === end sensitive information ===
 
 # === begin configurable information ===
