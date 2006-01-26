@@ -532,13 +532,19 @@ sub log_db ($)
 {
     my $msg = shift;
 
+    my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
+
+    # first update a log file in text format for redundancy 
+    open IN, ">>electives.log";
+    print IN "$timestr: $msg\n";
+    close IN;
+
     my $dbh = DBI->connect($datasource, $dblogin, $dbpassword);
     
     unless ($dbh) {
       return -1;
     }
     
-    my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
     my $status = $dbh->do("INSERT INTO log VALUES ('$timestr', '$msg');");
 
     unless ($status) {
