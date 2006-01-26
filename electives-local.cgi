@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: electives-local.cgi,v 1.2 2006/01/25 19:08:56 a14562 Exp $
+# $Id: electives-local.cgi,v 1.3 2006/01/26 09:16:04 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -539,13 +539,19 @@ sub log_db ($)
 {
     my $msg = shift;
 
+    my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
+
+    # first update a log file in text format for redundancy 
+    open IN, ">>electives.log";
+    print IN "$timestr: $msg\n";
+    close IN;
+
     my $dbh = DBI->connect($datasource, $dblogin, $dbpassword);
     
     unless ($dbh) {
       return -1;
     }
     
-    my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
     my $status = $dbh->do("INSERT INTO log VALUES ('$timestr', '$msg');");
 
     unless ($status) {
