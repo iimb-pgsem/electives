@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.2 2006/01/25 18:59:04 a14562 Exp $
+# $Id: elec.pl,v 1.3 2006/01/26 08:54:11 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -10,19 +10,18 @@
 # This program reads three files 
 # 
 # - courses.txt (course code, name, instructor, cap, slot)
-# - students.txt (rollno, name, email, cgpa)
+# - students.txt (rollno, name, email, cgpa, credits)
 # - choices.txt (rollno, #courses, list of courses)
 # 
 # and allocates courses as per student preferences.
 # 
-# Seniority (yearwise), course priority, and CGPA are considered.
+# seniority (based on batch and #credits), course priority, and CGPA are considered.
 #
-# invariants (at the end of allocation):
+# conditions (at the end of allocation):
 # 
 # #students allotted per course < cap for the course
-# 
+# #courses allotted to student <= #courses requested
 # if (si, cj) is an allottement (si, cj) is a request
-# -- only requested courses are allotted
 # 
 # if (si, cj) is not allotted with a reason capped,
 # then all of the following are true:
@@ -34,14 +33,14 @@
 #
 # there does not exist an allocation (sk, cj) where
 # seniority(sk) == senirority(si) AND
-# priority(sk, ci) LOWER TO priority(si, cj)
+# priority(sk, cj) LOWER TO priority(si, cj)
 #
 # there does not exist an allocation (sk, ci) where
 # seniority(sk) == senirority(si) AND
 # priority(sk, cj) EQUALS priority(si, cj) AND
 # cgpa(sk) < cgpa(si)
 # 
-# there does not exist an allocation (sk, ci) where
+# there does not exist an allocation (sk, cj) where
 # seniority(sk) == senirority(si) AND
 # priority(sk, cj) EQUALS priority(si, cj) AND
 # cgpa(sk) == cgpa(si) AND
@@ -65,7 +64,8 @@ my $max_credits = 105; # TODO verify
 my $credits_pass = 93; 
 # >=93 credits already taken => no seniority preference
 my $senior_year = 2003;
-# latest year upto which seniority preference is given
+# latest joining year upto which seniority preference is given
+my $current_year = 2004;
 
 my $max_courses = 4;
 my $give_priority_to_seniors = 1;
@@ -187,6 +187,27 @@ sub print_courses ()
     print "\n";
 }
 
+sub year_from_rollno($)
+{
+    my $rollno = shift;
+
+    # TODO: change algorithm for <=2003
+    return substr($rollno, 0, 4);
+}
+
+sub seniority_from_rollno($)
+{
+    my ($rollno) = shift;
+    
+    my $year = year_from_rollno($rollno);
+    my $credits = $students{$rollno}{"credits"};
+    if (($year <= $senior_year) && ($credits < $credits_pass)) {
+        return $year;
+    } else {
+        return $current_year;
+    }
+}
+
 sub load_students($)
 {
     my $errors = 0;
@@ -232,6 +253,7 @@ sub load_students($)
         $students{$rollno}{"email"} = $email;
         $students{$rollno}{"cgpa"} = $cgpa;
         $students{$rollno}{"credits"} = $credits;
+        $students{$rollno}{"seniority"} = seniority_from_rollno($rollno);
 
     }
     close IN;
@@ -242,6 +264,7 @@ sub print_students ()
 {
     print "=== Students ===\n";
     foreach my $rollno (sort keys %students) {
+
         print join('; ',
             $rollno,
             $students{$rollno}{"name"},
@@ -337,21 +360,15 @@ sub print_choices ()
 sub by_rank ($)
 {
     my $course = shift;
+    my $retval;
 
     if ($give_priority_to_seniors) {
-        my $ayear = substr($a->{"rollno"}, 0, 4);
-        my $byear = substr($b->{"rollno"}, 0, 4);
-        my $acredits = $students{$a->{"rollno"}}{"credits"};
-        my $bcredits = $students{$b->{"rollno"}}{"credits"};
-        if (($ayear <= $senior_year) && ($acredits < $credits_pass) && ($byear > $senior_year)) {
-            return -1;
-        }
-        if (($ayear > $senior_year) && ($byear <= $senior_year) && ($bcredits < $credits_pass)) {
-            return 1;
-        }
+        $retval = $students{$a->{"rollno"}}{"seniority"} <=> 
+                  $students{$b->{"rollno"}}{"seniority"};
+        return $retval if ($retval != 0);
     }
 
-    my $retval = ($a->{"priority"} <=> $b->{"priority"});
+    $retval = ($a->{"priority"} <=> $b->{"priority"});
 
     if ($give_priority_to_cgpa && ($retval == 0)) {
         if (defined($a->{"cgpa"}) && defined($b->{"cgpa"})) {
@@ -359,7 +376,7 @@ sub by_rank ($)
         }
         if ($retval == 0) {
             $retval = $a->{"rollno"} <=> $b->{"rollno"};
-            err_print("warning: roll number based allocation: " .
+            err_print("warning: roll number based ranking: " .
                 "'$course': $a->{'rollno'},$b->{'rollno'}");
         }
     }
@@ -428,17 +445,8 @@ sub allocate_in_round($$)
 {
     my ($round, $rec) = @_;
 
-    my $year = substr($rec->{"rollno"}, 0, 4);
-    my $credits = $students{$rec->{"rollno"}}{"credits"};
-    my $flag = (($year <= $senior_year) && ($credits < $credits_pass));
-
-    if ($round == 1) {
-        return $flag;
-    }
-
-    if ($round == 2) {
-        return !$flag;
-    }
+    my $seniority = seniority_from_rollno($rec->{"rollno"});
+    return ($round == $seniority);
 }
 
 sub do_allocation ($)
@@ -480,8 +488,11 @@ sub allocate_courses
         return 0;
     }
 
-    do_allocation(1);
-    do_allocation(2);
+    # TODO: derive years automatically 
+
+    for (my $year = 2002; $year <= $current_year; ++$year) {
+      do_allocation($year);
+    }
 
     return 1;
 }
