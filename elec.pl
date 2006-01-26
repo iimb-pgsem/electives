@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.4 2006/01/26 09:07:33 a14562 Exp $
+# $Id: elec.pl,v 1.5 2006/01/26 10:45:37 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -54,6 +54,8 @@
 
 
 use strict;
+
+use Spreadsheet::WriteExcel;
 
 # constants
 my $default_cap = 70;
@@ -525,6 +527,49 @@ sub print_allocation_by_course
     print "\n";
 }
 
+sub write_excel
+{
+    my $workbook = Spreadsheet::WriteExcel->new("allocation.xls");
+
+    my @header = ('Rank', 'Roll Number', 'Priority', 
+                  'Credits', 'CGPA', 'Status');
+
+    my $format = $workbook->add_format();
+    $format->set_bold();
+
+    foreach my $course (sort keys %allocation) {
+
+      my $sheet = $workbook->add_worksheet($course);
+    
+      my $row = 0;
+      my $col = 0;
+
+      for ($col = 0; $col < @header; ++$col) {
+          $sheet->write($row, $col, $header[$col], $format);
+      }
+
+      $row = 1;
+      $col = 0;
+
+      my $count = 1;
+
+      foreach my $rec (@{$allocation{$course}{"studentlist"}}) {
+
+          $sheet->write($row, $col++, $count);
+          $sheet->write($row, $col++, $rec->{"rollno"});
+          $sheet->write($row, $col++, $rec->{"priority"});
+          $sheet->write($row, $col++, $rec->{"credits"});
+          $sheet->write($row, $col++, $rec->{"cgpa"});
+          $sheet->write($row, $col++, $rec->{"reason"});
+
+          ++$row;
+          ++$count;
+          $col = 0;
+      }
+
+    }
+}
+
 sub print_allocation_by_student
 {
     print "=== Allocation by student ===\n";
@@ -599,6 +644,8 @@ sub main
     print_allocation_by_student;
 
     compute_conflicts;
+
+    write_excel();
 }
 
 main;
