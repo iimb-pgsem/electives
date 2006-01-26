@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.3 2006/01/26 08:54:11 a14562 Exp $
+# $Id: elec.pl,v 1.4 2006/01/26 09:07:33 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -333,8 +333,8 @@ sub load_choices($)
             $student_courses{$course} = 1;
         }
 
-        if ($ncourses != (keys %student_courses)) {
-            err_print("error:$file:$.: mismatch in number of courses");
+        if ($ncourses > (keys %student_courses)) {
+            err_print("error:$file:$.: #choices < #courses");
             next LINE;
         }
 
@@ -394,6 +394,7 @@ sub map_choices_to_courses
             my %rec;
             $rec{"rollno"} = $rollno;
             $rec{"priority"} = $index + 1;
+            $rec{"credits"} = $students{$rollno}{"credits"};
             $rec{"cgpa"} = $students{$rollno}{"cgpa"};
             push @{$allocation{$course}{"studentlist"}}, \%rec; 
         }
@@ -413,9 +414,17 @@ sub allocate_course($$)
 {
     my ($rec, $course) = @_;
 
+    my $rollno = $rec->{"rollno"};
+    $choices{$rollno}{"nallotted"} ||= 0;
     $allocation{$course}{"nallotted"} ||= 0;
 
-    $allocation{$course}{"rollno"}{$rec->{"rollno"}} = $rec;
+    $allocation{$course}{"rollno"}{$rollno} = $rec;
+
+    if ($choices{$rollno}{"nallotted"} >= $choices{$rollno}{"ncourses"}) {
+        $rec->{"allotted"} = 0;
+        $rec->{"reason"} = "complete";
+        return 0;
+    }
 
     if ($allocation{$course}{"nallotted"} >= $courses{$course}{"cap"}) {
         $rec->{"allotted"} = 0;
@@ -436,7 +445,8 @@ sub allocate_course($$)
 
     $rec->{"allotted"} = 1;
     $rec->{"reason"} = "allotted";
-    $students{$rec->{"rollno"}}{"slot"}{$slot} = $course;
+    $students{$rollno}{"slot"}{$slot} = $course;
+    ++$choices{$rollno}{"nallotted"};
     ++$allocation{$course}{"nallotted"};
     return 1;
 }
@@ -506,6 +516,7 @@ sub print_allocation_by_course
         print "    ", 
             "rollno = ", $rec->{"rollno"}, ", ",
             "priority = ", $rec->{"priority"}, ", ",
+            "credits = ", $rec->{"credits"} || "", ", ", 
             "cgpa = ", $rec->{"cgpa"} || "", ", ", 
             "reason = ", $rec->{"reason"} || "", "\n";
       }
