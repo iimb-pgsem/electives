@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.3 2006/01/26 09:18:14 a14562 Exp $
+# $Id: electives.cgi,v 1.4 2006/01/28 19:54:46 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -33,7 +33,8 @@ my $title = "PGSEM 2005-06 Quarter 3 Electives Submission";
 # === end configurable information
 
 my %states = (
-              'default' => \&print_start_page,
+              'default' => \&print_login_page,
+              'Get Passcode' => \&print_login_page,
               'Submit Roll Number' => \&print_authentication_page,
               'Authenticate' => \&print_electives_page,
               'Submit Preferences' => \&print_ack_page
@@ -189,22 +190,20 @@ sub no_such_page()
     die "No such page exists";
   }
 
-sub print_start_page()
+sub print_login_page()
   {
     print 
       header(), 
       start_html($title),
       start_form(),
     
-      b("Step 1 of 3: submit roll number"), br,
-      "Step 2 of 3: Submit authentication code", br,
-      "Step 3 of 3: Submit preferences", br,
+      print b($title), br, 
 
       br,
 
-      "Roll Number (e.g., 2004101): ",
-      textfield(-name=>'rollno',  -size=>50, -maxlength=>80), br,
-      br, to_page('Submit Roll Number'),
+      "Roll Number: ",
+      textfield(-name=>'rollno',  -size=>50, -maxlength=>8),
+      to_page('Get Passcode'),
 
       br,
 
@@ -279,6 +278,7 @@ sub send_mail($$$$$)
     return 0;
 }
 
+# deprecated
 sub print_authentication_page()
   {
     my $rollno;
