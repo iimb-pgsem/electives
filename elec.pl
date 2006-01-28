@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.5 2006/01/26 10:45:37 a14562 Exp $
+# $Id: elec.pl,v 1.6 2006/01/28 20:07:37 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -60,6 +60,7 @@ use Spreadsheet::WriteExcel;
 # constants
 my $default_cap = 70;
 my $max_cgpa = 4.0;
+my $min_cgpa_four_courses = 2.75;
 my $min_credits = 36; # TODO verify
 my $max_credits = 105; # TODO verify
 
@@ -193,8 +194,12 @@ sub year_from_rollno($)
 {
     my $rollno = shift;
 
-    # TODO: change algorithm for <=2003
-    return substr($rollno, 0, 4);
+    my $year = substr($rollno, 0, 4);
+    $year =~ s/2021/2000/;
+    $year =~ s/2104/2001/;
+    $year =~ s/2204/2002/;
+
+    return $year;
 }
 
 sub seniority_from_rollno($)
@@ -425,6 +430,13 @@ sub allocate_course($$)
     if ($choices{$rollno}{"nallotted"} >= $choices{$rollno}{"ncourses"}) {
         $rec->{"allotted"} = 0;
         $rec->{"reason"} = "complete";
+        return 0;
+    }
+
+    if (($choices{$rollno}{"nallotted"} == 3) &&
+        ($students{$rollno}{'cgpa'} < $min_cgpa_four_courses)) {
+        $rec->{"allotted"} = 0;
+        $rec->{"reason"} = "onlythree";
         return 0;
     }
 
