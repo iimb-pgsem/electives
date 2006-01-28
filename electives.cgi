@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.5 2006/01/28 20:10:30 a14562 Exp $
+# $Id: electives.cgi,v 1.6 2006/01/28 20:24:08 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -21,8 +21,8 @@ use POSIX qw(strftime);
 my $login = '';
 my $password = '';
 my $datasource = "DBI:mysql:sankara_q42005";
-my $dblogin = '';
-my $dbpassword = '';
+my $dblogin = 'sankara_sankar';
+my $dbpassword = 'sankar123';
 # === end sensitive information ===
 
 # === begin configurable information ===
