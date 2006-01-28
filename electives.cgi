@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.4 2006/01/28 19:54:46 a14562 Exp $
+# $Id: electives.cgi,v 1.5 2006/01/28 20:10:30 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -27,16 +27,15 @@ my $dbpassword = '';
 
 # === begin configurable information ===
 my $send_email = 1;
-my $pop_required = 0;
+my $pop_required = 1;
 my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2005-06 Quarter 3 Electives Submission";
+my $title = "PGSEM 2005-06 Quarter 4 (February - April 2006) Electives Submission";
 # === end configurable information
 
 my %states = (
               'default' => \&print_login_page,
-              'Get Passcode' => \&print_login_page,
-              'Submit Roll Number' => \&print_authentication_page,
-              'Authenticate' => \&print_electives_page,
+              'Get Passcode' => \&print_authentication_page,
+              'Login' => \&print_electives_page,
               'Submit Preferences' => \&print_ack_page
              );
 
@@ -191,36 +190,33 @@ sub no_such_page()
   }
 
 sub print_login_page()
-  {
-    print 
-      header(), 
-      start_html($title),
-      start_form(),
-    
-      print b($title), br, 
+{
+    print header(), start_html($title), h1($title);
 
-      br,
+    print
+        start_form(),
+        
+        "<table><tr>\n",
 
-      "Roll Number: ",
-      textfield(-name=>'rollno',  -size=>50, -maxlength=>8),
-      to_page('Get Passcode'),
+        "<td>Roll Number:</td>",
+        "<td>", textfield(-name=>'rollno',  -size=>20, -maxlength=>7),
+        to_page('Get Passcode'), "</td></tr>",
 
-      br,
+        "<tr><td>Passcode:</td>",
+        "<td>", textfield(-name=>'authcode',  -size=>20, -maxlength=>20),
+        to_page('Login'), "</td></tr></table>", 
 
-      "Once submitted, you will soon receive an e-mail with an authentication code. ",
-      "Please use the authentication code in Step 2.",
+        br,
 
-      br,
+        end_html();
+}
 
-      end_html();
-  }
-
-sub get_authentication_code($)
+sub create_authentication_code($)
   {
     my $rollno = shift;
 
     my $code = srand($rollno ^ time ^ $$);
-    $code = int(rand(0xFFFFFFFF));
+    $code = int(rand(0x7FFFFFFF)); # invariant: $code > 0
     return $code; 
   }
 
@@ -278,12 +274,46 @@ sub send_mail($$$$$)
     return 0;
 }
 
-# deprecated
+sub store_authcode_to_db ($$)
+{
+    my ($rollno, $authcode) = @_;
+
+    my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
+        {AutoCommit => 1, RaiseError => 1} );
+
+    unless ($dbh) {
+      print br, "Error: unable to connect to database",
+        br, end_html();
+      return -1;
+    }
+
+    my $status;
+    eval {
+      # $dbh->begin_work();
+      $status = $dbh->do("DELETE FROM authcode WHERE rollno = '$rollno';");
+      die "DELETE failed" unless $status;
+      $dbh->do("INSERT INTO authcode VALUES ('$rollno', '$authcode');");
+      die "INSERT failed" unless $status;
+      # $dbh->commit();
+    };
+
+    if ($@) {
+      # eval { $dbh->rollback() };
+      print br, "Error: unable to update database: $@",
+        br, end_html();
+      $dbh->disconnect();
+      return -1;
+    }
+
+    $dbh->disconnect();
+    return 0;
+}
+
 sub print_authentication_page()
   {
     my $rollno;
 
-    print header(), start_html($title);
+    print header(), start_html($title), h1($title);
 
     if (!defined(param('rollno'))) {
 
@@ -300,86 +330,74 @@ sub print_authentication_page()
     }
 
     unless (defined($students{$rollno})) {
-      print br, "Error: roll number '$rollno' is not present in the database", 
+      print br, "Error: roll number '$rollno' is not present in the database.", br,
+        "If this is a valid roll number, please send e-mail to ",
+        "<a href=\"mailto:pgsemelectives\@sankara.net\">pgsemelectives\@sankara.net</a>",
+        " reporting the problem.", br,
         br, end_html();
       return;
     }
 
-    my $code = get_authentication_code($rollno);
+    print "<table>\n";
+    print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
+    print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
+    print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "</table>\n";
+    print br;
 
-    # update database
+    my $code = get_authcode_from_db($rollno);
 
-    my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
-        {AutoCommit => 1, RaiseError => 1} );
+    return if (($code < 0) && ($code != -2));
 
-    unless ($dbh) {
-      print br, "Error: unable to connect to database",
-        br, end_html();
-      return;
+    if ($code == -2) {
+
+        $code = create_authentication_code($rollno);
+        my $rv = store_authcode_to_db($rollno, $code);
+        return if ($rv != 0);
+        log_db("OK: passcode_created: rollno=$rollno code=$code");
+
+    } else {
+
+        log_db("OK: passcode_loaded: rollno=$rollno code=$code");
     }
-
-    my $status;
-    eval {
-      # $dbh->begin_work();
-      $status = $dbh->do("DELETE FROM authcode WHERE rollno = '$rollno';");
-      die "DELETE failed" unless $status;
-      $dbh->do("INSERT INTO authcode VALUES ('$rollno', '$code');");
-      die "INSERT failed" unless $status;
-      # $dbh->commit();
-    };
-
-    if ($@) {
-      # eval { $dbh->rollback() };
-      print br, "Error: unable to update database: $@",
-        br, end_html();
-      return;
-    }
-
-    $dbh->disconnect();
-
-    log_db("OK: authrequest: created: rollno=$rollno code=$code");
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
-    my $subject = "Authentication code";
-    my $body = "\nAuthentication code: $code\n";
+    my $subject = "Passcode";
+    my $body = "\nPasscode: $code\n";
     my $to = $students{$rollno}{"email"};
 
     my $rv = send_mail($rollno, $from, $to, $subject, $body);
     return if ($rv != 0);
 
-    log_db("OK: authrequest: mail sent: rollno=$rollno");
+    log_db("OK: passcode_sent: rollno=$rollno code=$code");
 
+        
     print
       start_form(),
 
       hidden('rollno'),
     
-      "Step 1 of 3: submit roll number", br,
-      b("Step 2 of 3: Submit authentication code"), br,
-      "Step 3 of 3: Submit preferences", br,
-
-      br,
-
-      "An e-mail has been sent to '$to' with the authentication code.", br,
+      "An e-mail has been sent to '$to' with the passcode.", br,
       "Please use that code to fill the form below.", br, br,
 
-      "Roll Number: $rollno", br,
-      "Authentication code: ", br,
-      textfield(-name=>'authcode',  -size=>50, -maxlength=>80), br,
-      br, to_page('Authenticate'),
+      "<table><tr>\n",
 
-      br,
+      "<td>Roll Number:</td>",
+      "<td>", textfield(-name=>'rollno',  -size=>20, -maxlength=>8, -value=>'$rollno'),
+      to_page('Get Passcode'), "</td></tr>",
 
-      "Once authenticated, you will be able to enter and submit your course preferences.", 
+      "<tr><td>Passcode:</td>",
+      "<td>", textfield(-name=>'authcode',  -size=>20, -maxlength=>20),
+      to_page('Login'), "</td></tr></table>", 
 
       br,
 
       end_html();
-  }
+}
 
-sub validate_auth_code ($$)
+sub get_authcode_from_db($)
 {
-    my ($rollno, $authcode) = @_;
+    my $rollno = shift;
 
     my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
         {AutoCommit => 1, RaiseError => 1} );
@@ -392,15 +410,13 @@ sub validate_auth_code ($$)
     
     my $status;
     my $sth;
-    do {
-      $sth = $dbh->prepare("SELECT authcode FROM authcode WHERE rollno = '$rollno'");
-      $status = $sth->execute();
-      last unless $status;
-    } while (0);
+    $sth = $dbh->prepare("SELECT authcode FROM authcode WHERE rollno = '$rollno'");
+    $status = $sth->execute();
     
     unless ($status) {
       print br, "Error: unable to read from database",
         br, end_html();
+      $dbh->disconnect();
       return -1;
     }
     
@@ -417,16 +433,63 @@ sub validate_auth_code ($$)
       return -2;
     } 
 
-    if ($dbauthcode ne $authcode) {
-      return -3;
+    return $dbauthcode; # invariant: $dbauthcode > 0
+}
+
+sub get_preferences_from_db($$)
+{
+    my $rollno = shift;
+    my $rec = shift;
+
+    my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
+        {AutoCommit => 1, RaiseError => 1} );
+    
+    unless ($dbh) {
+      print br, "Error: unable to connect to database",
+        br, end_html();
+      return -1;
     }
-   
-    return 0;
+    
+    my $status;
+    my $sth;
+    $sth = $dbh->prepare("SELECT priority, ncourses, course FROM choices WHERE rollno = '$rollno'");
+    $status = $sth->execute();
+    
+    unless ($status) {
+      print br, "Error: unable to read from database",
+        br, end_html();
+      $dbh->disconnect();
+      return -1;
+    }
+    
+    my ($priority, $ncourses, $course);
+
+    $sth->bind_columns(\$priority, \$ncourses, \$course);
+    while ($sth->fetch()) {
+      $#{$rec->{"courses"}} = $priority-1;
+      ${$rec->{"courses"}}[$priority-1] = $course;
+      $rec->{"ncourses"} = $ncourses;
+    }
+    
+    $sth->finish();
+    $dbh->disconnect();
+    
+    return 0; 
+}
+
+sub is_authcode_ok($$)
+{
+    my ($rollno, $authcode) = @_;
+
+    my $rv = get_authcode_from_db($rollno);
+
+    return 0 if ($rv < 0);
+    return ($rv == $authcode);
 }
 
 sub print_electives_page ()
-  {
-    print header(), start_html($title);
+{
+    print header(), start_html($title), h1($title);
     
     if (!defined(param('rollno')) ||
         !defined(param('authcode'))) {
@@ -438,102 +501,90 @@ sub print_electives_page ()
     my $rollno = param('rollno');
     my $authcode = param('authcode');
    
-    my $rv = validate_auth_code($rollno, $authcode);
-
-    return if ($rv == -1);
-
-    if ($rv == -2) {
-      print br, "Error: no record exists for Roll No: '$rollno'", 
+    unless (is_authcode_ok($rollno, $authcode)) {
+      print br, "Error: invalid passcode '$authcode' for '$rollno'", 
         br, end_html();
-      return;
-    } 
-    
-    if ($rv == -3) {
-      print br, "Error: invalid authentication code '$authcode' for '$rollno'", 
-        br, end_html();
+      log_db("FAIL: login: rollno=$rollno code=$authcode");
       return;
     }
 
-    log_db("OK: authresponse: rollno=$rollno");
+    log_db("OK: login: rollno=$rollno");
    
-    if ($rv == 0) {
-      load_courses("$config_dir/courses.txt");
-    
-      print
-        start_form(),
-    
-        hidden('rollno'),
-        hidden('authcode'),
-        
-        "Step 1 of 3: Submit roll number", br,
-        "Step 2 of 3: Submit authentication code", br,
-        b("Step 3 of 3: Submit preferences"), br;
-    
-   
-      print br;
-      print "Courses offered for your reference:", br;
+    my $errors = load_students("$config_dir/students.txt");
+    if ($errors) {
+      print "Internal error: error loading students database", br, end_html();
+      return;
+    }
 
-      print "<table border='1'>\n";
+    print "<table>\n";
+    print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
+    print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
+    print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "</table>\n";
+   
+    load_courses("$config_dir/courses.txt");
     
+    print
+      start_form(),
+      hidden('rollno'),
+      hidden('authcode');
+      
+    print br;
+    print "Courses offered for your reference:", br;
+
+    print "<table border='1'>\n";
+    
+    print "<tr>\n";
+    print "<td><b>Slot</b></td>\n";
+    print "<td><b>Code</b></td>\n";
+    print "<td><b>Name</b></td>\n";
+    print "<td><b>Instructor</b></td>\n";
+    print "<td><b>Cap</b></td>\n";
+    print "</tr>\n";
+   
+    my @courselist = "--------";
+
+    foreach my $course (sort 
+      { my $val = $courses{$a}{"slot"} <=> $courses{$b}{"slot"};
+        return $val || ($a cmp $b) } 
+    
+      keys %courses) {
+     
       print "<tr>\n";
-      print "<td><b>Slot</b></td>\n";
-      print "<td><b>Code</b></td>\n";
-      print "<td><b>Name</b></td>\n";
-      print "<td><b>Instructor</b></td>\n";
-      print "<td><b>Cap</b></td>\n";
+    
+      print "<td>$courses{$course}{'slot'}</td>";
+      print "<td>$course</td>";
+      print "<td>$courses{$course}{'name'}</td>";
+      print "<td>$courses{$course}{'instructor'}</td>";
+      print "<td>$courses{$course}{'cap'}</td>";
+   
+      push @courselist, "$course:Slot $courses{$course}{'slot'}:$courses{$course}{'name'}";
+
       print "</tr>\n";
-   
-      my @courselist = "--------";
-
-      foreach my $course (sort 
-        { my $val = $courses{$a}{"slot"} <=> $courses{$b}{"slot"};
-          return $val || ($a cmp $b) } 
-    
-        keys %courses) {
-       
-        print "<tr>\n";
-    
-        print "<td>$courses{$course}{'slot'}</td>";
-        print "<td>$course</td>";
-        print "<td>$courses{$course}{'name'}</td>";
-        print "<td>$courses{$course}{'instructor'}</td>";
-        print "<td>$courses{$course}{'cap'}</td>";
-   
-        push @courselist, "$course:Slot $courses{$course}{'slot'}:$courses{$course}{'name'}";
-
-        print "</tr>\n";
-      }
-   
-      print "</table>\n";
-      print br;
-
-      print
-        "Roll Number: $rollno", br,
-    
-          "Number of courses: ", 
-            popup_menu(-name=>'ncourses', -values=>['1', '2', '3', '4']), br;
-   
-
-      for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
-
-        my $pref = $i + 1;
-        print "Preference $pref: ";
-        print popup_menu(-name=>"pref$pref", -values=>\@courselist);
-        print br;
-      }
-
-      print br, to_page('Submit Preferences'), br;
-
-      print 
-        "Soon after submission you will receive an e-mail acknowledgement.", 
-    
-        br,
-    
-        end_html();
-
-      return;
     }
-  }
+   
+    print "</table>\n";
+    print br;
+
+   print
+        "Number of courses: ", 
+          popup_menu(-name=>'ncourses', -values=>['1', '2', '3', '4']), br;
+   
+
+    for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
+
+      my $pref = $i + 1;
+      print "Preference $pref: ";
+      print popup_menu(-name=>"pref$pref", -values=>\@courselist);
+      print br;
+    }
+
+    print br, to_page('Submit Preferences'), br;
+
+    print end_html();
+
+    return;
+}
 
 sub log_db ($)
 {
@@ -604,7 +655,7 @@ sub update_db_with_preferences ($$$)
 
 sub print_ack_page ()
   {
-    print header(), start_html($title);
+    print header(), start_html($title), h1($title);
     
     if (!defined(param('rollno')) ||
         !defined(param('authcode')) ||
@@ -630,24 +681,24 @@ sub print_ack_page ()
       return;
     }
 
-    my $code = get_authentication_code($rollno);
+    return unless (is_authcode_ok($rollno, $authcode));
 
-    my $rv = validate_auth_code($rollno, $authcode);
-
-    return if ($rv == -1);
-
-    if ($rv == -2) {
-      print br, "Error: no record exists for Roll No: '$rollno'", 
-        br, end_html();
-      return;
-    } 
-    
-    if ($rv == -3) {
-      print br, "Error: invalid authentication code '$authcode' for '$rollno'", 
+    unless (defined($students{$rollno})) {
+      print br, "Error: roll number '$rollno' is not present in the database.", br,
+        "If this is a valid roll number, please send e-mail to ",
+        "<a href=\"mailto:pgsemelectives\@sankara.net\">pgsemelectives\@sankara.net</a>",
+        " reporting the problem.", br,
         br, end_html();
       return;
     }
- 
+
+    print "<table>\n";
+    print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
+    print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
+    print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "</table>\n";
+    print br;
+
     unless ($ncourses =~ /[1234]/) {
         print "Error: invalid number of courses", br, end_html();
         log_db("FAIL: preferences: invalid number of courses: rollno=$rollno");
@@ -703,20 +754,25 @@ sub print_ack_page ()
         return;
     }
 
-    $rv = update_db_with_preferences($rollno, $ncourses, join(',', @choices));
+    my $rv = update_db_with_preferences($rollno, $ncourses, join(',', @choices));
     return if ($rv != 0);
 
     log_db("OK: preferences: rollno=$rollno, ncourses=$ncourses, courselist=" . join(':', @choices));
+
+    my %rec;
+    my $rec = \%rec;
+    $rv = get_preferences_from_db($rollno, $rec);
+    return if ($rv != 0);
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
     my $subject = "Course preferences";
 
     my $body = "\n";
-    $body .= "Roll No: $rollno\n\n";
-    $body .= "Number of courses: $ncourses\n\n";
+    $body .= "Roll Number: $rollno\n\n";
+    $body .= "Number of courses: $rec->{'ncourses'}\n\n";
     $body .= "Course preferences:\n";
     my $index = 1;
-    foreach my $course (@choices) {
+    foreach my $course (@{$rec->{'courses'}}) {
         $body .= "Preference $index: $course: $courses{$course}{'name'}\n"; 
         ++$index;
     }
@@ -730,12 +786,12 @@ sub print_ack_page ()
     print "An e-mail has been sent to '$to' as an acknowledgement.", br;
     print "You may also want to print this page for future reference.", br, br;
 
-    print "<i>Roll No: </i><b>$rollno</b>", br, br;
+    print "<i>Roll Number: </i><b>$rollno</b>", br, br;
     print "<i>Number of courses: </i><b>$ncourses</b>", br, br;
     print "<i>Course preferences:</i>", br;
 
     $index = 1;
-    foreach my $course (@choices) {
+    foreach my $course (@{$rec->{'courses'}}) {
       print "<b>Preference $index: $course: $courses{$course}{'name'}</b>", br; 
       ++$index;
     }
