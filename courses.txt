@@ -1,0 +1,12 @@
+AMRM;Advanced Market Research  & Models;Srinivas Prakhya;;F1,S1
+SMM;Services Marketing & Management;Anand Kasturi;;S4,S5
+CMS;Competitive Marketing Strategy;NB Kanagal;60;F2,S2
+NEF;New Enterprise Financing;G Sabarinathan;;F2,S2
+M&A;Mergers and Acquisition;Utkarsh Mazumdar;60;S4,S5
+MOSIT;Managing Off shored Software & IT Services;S Krishna;;S1,S2
+QSM;Quantitative Software Management;J Veeraraghavan;;F1,S1
+LCM;Leadership and Change Management;Amit Chatterjee;60;S4,S5
+IPRs;IPRs: Innovation and Hi-Tech Entrepreneurial Competitiveness;A Damodaran & T Ramakrishna;60;F1,S1
+VEIL;Venturing through Entrepreneurial / Intrapreneurial Leadership;DVR Seshadri & P Muralidhar;;F3,S3
+FL;French Language;Lakshmi Suryanarayan;;F3,S3
+EEE;Embedding Evolutionary Excellence;J M Sampath;;F2,S2
