@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.7 2006/02/04 17:41:46 a14562 Exp $
+# $Id: electives.cgi,v 1.8 2006/02/04 19:20:04 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -200,7 +200,8 @@ sub print_login_page()
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
 students for applying for elective courses for the quarter starting
-Feb. 2006</div> <div style="">The process of applying for the electives
+Feb. 2006.<br>Submission deadline is 24:00 IST, Monday, 6 February, 2006.</div>
+<div style="">The process of applying for the electives
 can be accomplished in three easy steps. These are as
 follows:<ol><li>Get a passcode: Use the form below, enter your roll
 number and press the "Get Passcode" button. A passcode will be e-mailed
