@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.6 2006/01/28 20:24:08 a14562 Exp $
+# $Id: electives.cgi,v 1.7 2006/02/04 17:41:46 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -27,7 +27,7 @@ my $dbpassword = 'sankar123';
 
 # === begin configurable information ===
 my $send_email = 1;
-my $pop_required = 1;
+my $pop_required = 0;
 my $config_dir = "$FindBin::Bin"; # at least for the present
 my $title = "PGSEM 2005-06 Quarter 4 (February - April 2006) Electives Submission";
 # === end configurable information
@@ -44,7 +44,6 @@ my %states = (
 my %students;
 my %courses;
 my $max_cgpa = 4.0;
-my $default_cap = 70;
 
 sub err_print($)
   {
@@ -140,19 +139,13 @@ sub load_courses($)
         next;
       }
 
-      if (defined($cap) && (($cap < 1) || ($cap > $default_cap))) {
+      if (defined($cap) && (($cap < 1))) {
         err_print("error:$file:$.: invalid cap '$cap'");
-        next;
-      }
-
-      if (defined($slot) && !($slot =~ /[1234]/)) {
-        err_print("error:$file:$.: invalid slot '$slot' - must be [1234]");
         next;
       }
 
       $name ||= "";
       $instructor ||= "";
-      $cap ||= $default_cap;
 
       $courses{$code}{"name"} = $name;
       $courses{$code}{"instructor"} = $instructor;
@@ -189,9 +182,38 @@ sub no_such_page()
     die "No such page exists";
   }
 
+sub local_end_html()
+{
+  return <<'EOF' . "<br>Page generated at " . localtime() . end_html();
+<hr>&copy; 2006 Sankaranarayanan K. V. and Abhay Ghaisas. If you face any 
+problems, please contact <a href="mailto:pgsemelectives@sankara.net">
+pgsemelectives@sankara.net</a>.
+EOF
+
+}
+
 sub print_login_page()
 {
-    print header(), start_html($title), h1($title);
+    print header(), start_html($title), h3($title);
+
+    print <<'EOF';
+<div style="background-color:#ffd; border:black solid
+2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
+students for applying for elective courses for the quarter starting
+Feb. 2006</div> <div style="">The process of applying for the electives
+can be accomplished in three easy steps. These are as
+follows:<ol><li>Get a passcode: Use the form below, enter your roll
+number and press the "Get Passcode" button. A passcode will be e-mailed
+to you at your IIMB email id. This is necessary so as to ensure that no
+one else can enter elective choices on your behalf.</li> <li>Login: You
+can now login by entering your roll number and this passcode and
+pressing the "Login" button. You will be sent to the elective choice
+page.</li><li>Choose: In the elective choice page, give your choices as
+per the priority (first course is highest priority) and submit the
+choices you want to take. This will acknowledge the choices you selected
+by listing them and will also send you a mail about the courses you
+chose.</li></ol> </div>
+EOF
 
     print
         start_form(),
@@ -208,7 +230,7 @@ sub print_login_page()
 
         br,
 
-        end_html();
+        local_end_html();
 }
 
 sub create_authentication_code($)
@@ -235,6 +257,13 @@ sub send_mail($$$$$)
       my $smtp = Net::SMTP->new("mail.sankara.net", 
                                 Debug => 1);
 
+      unless ($smtp) {
+        print "Transient error: unable to send e-mail; please try again after a few minutes";
+        log_db("FAIL: authrequest: error sending mail: SMTP: rollno=$rollno"); 
+        print local_end_html;
+        return -1;
+      }
+
       my $retval;
 
       $retval = $smtp->mail($from);
@@ -260,14 +289,14 @@ sub send_mail($$$$$)
 
       print "Error sending mail: unable to authenticate using POP3";
       log_db("FAIL: authrequest: error sending mail: POP3: rollno=$rollno"); 
-      print end_html;
+      print local_end_html;
       return -1;
     }
 
     if ($errors) {
       print "Internal error: unable to send e-mail; please try again";
       log_db("FAIL: authrequest: error sending mail: SMTP: rollno=$rollno"); 
-      print end_html;
+      print local_end_html;
       return -1;
     }
 
@@ -283,7 +312,7 @@ sub store_authcode_to_db ($$)
 
     unless ($dbh) {
       print br, "Error: unable to connect to database",
-        br, end_html();
+        br, local_end_html();
       return -1;
     }
 
@@ -300,7 +329,7 @@ sub store_authcode_to_db ($$)
     if ($@) {
       # eval { $dbh->rollback() };
       print br, "Error: unable to update database: $@",
-        br, end_html();
+        br, local_end_html();
       $dbh->disconnect();
       return -1;
     }
@@ -313,28 +342,24 @@ sub print_authentication_page()
   {
     my $rollno;
 
-    print header(), start_html($title), h1($title);
+    print header(), start_html($title), h3($title);
 
     if (!defined(param('rollno'))) {
 
-      print "Invalid input: please try again", end_html();
+      print "Invalid input: please try again", local_end_html();
       return;
     }
 
     $rollno = param('rollno');
 
     my $errors = load_students("$config_dir/students.txt");
-    if ($errors) {
-      print "Internal error: error loading students database", br, end_html();
-      return;
-    }
 
     unless (defined($students{$rollno})) {
       print br, "Error: roll number '$rollno' is not present in the database.", br,
         "If this is a valid roll number, please send e-mail to ",
         "<a href=\"mailto:pgsemelectives\@sankara.net\">pgsemelectives\@sankara.net</a>",
         " reporting the problem.", br,
-        br, end_html();
+        br, local_end_html();
       return;
     }
 
@@ -363,7 +388,7 @@ sub print_authentication_page()
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
     my $subject = "Passcode";
-    my $body = "\nPasscode: $code\n";
+    my $body = "Roll Number: $rollno\n\nPasscode: $code\n";
     my $to = $students{$rollno}{"email"};
 
     my $rv = send_mail($rollno, $from, $to, $subject, $body);
@@ -375,7 +400,7 @@ sub print_authentication_page()
     print
       start_form(),
 
-      hidden('rollno'),
+      #hidden('rollno'),
     
       "An e-mail has been sent to '$to' with the passcode.", br,
       "Please use that code to fill the form below.", br, br,
@@ -392,7 +417,7 @@ sub print_authentication_page()
 
       br,
 
-      end_html();
+      local_end_html();
 }
 
 sub get_authcode_from_db($)
@@ -404,7 +429,7 @@ sub get_authcode_from_db($)
     
     unless ($dbh) {
       print br, "Error: unable to connect to database",
-        br, end_html();
+        br, local_end_html();
       return -1;
     }
     
@@ -415,7 +440,7 @@ sub get_authcode_from_db($)
     
     unless ($status) {
       print br, "Error: unable to read from database",
-        br, end_html();
+        br, local_end_html();
       $dbh->disconnect();
       return -1;
     }
@@ -446,7 +471,7 @@ sub get_preferences_from_db($$)
     
     unless ($dbh) {
       print br, "Error: unable to connect to database",
-        br, end_html();
+        br, local_end_html();
       return -1;
     }
     
@@ -457,7 +482,7 @@ sub get_preferences_from_db($$)
     
     unless ($status) {
       print br, "Error: unable to read from database",
-        br, end_html();
+        br, local_end_html();
       $dbh->disconnect();
       return -1;
     }
@@ -489,12 +514,12 @@ sub is_authcode_ok($$)
 
 sub print_electives_page ()
 {
-    print header(), start_html($title), h1($title);
+    print header(), start_html($title), h3($title);
     
     if (!defined(param('rollno')) ||
         !defined(param('authcode'))) {
     
-      print "Invalid input: please try again", end_html();
+      print "Invalid input: please try again", local_end_html();
       return;
     }
     
@@ -503,7 +528,7 @@ sub print_electives_page ()
    
     unless (is_authcode_ok($rollno, $authcode)) {
       print br, "Error: invalid passcode '$authcode' for '$rollno'", 
-        br, end_html();
+        br, local_end_html();
       log_db("FAIL: login: rollno=$rollno code=$authcode");
       return;
     }
@@ -511,10 +536,6 @@ sub print_electives_page ()
     log_db("OK: login: rollno=$rollno");
    
     my $errors = load_students("$config_dir/students.txt");
-    if ($errors) {
-      print "Internal error: error loading students database", br, end_html();
-      return;
-    }
 
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
@@ -532,7 +553,7 @@ sub print_electives_page ()
     print br;
     print "Courses offered for your reference:", br;
 
-    print "<table border='1'>\n";
+    print "<font size=\"-1\"><table border='1'>\n";
     
     print "<tr>\n";
     print "<td><b>Slot</b></td>\n";
@@ -556,19 +577,26 @@ sub print_electives_page ()
       print "<td>$course</td>";
       print "<td>$courses{$course}{'name'}</td>";
       print "<td>$courses{$course}{'instructor'}</td>";
-      print "<td>$courses{$course}{'cap'}</td>";
+      print "<td>", $courses{$course}{'cap'}||"No cap", "</td>";
    
       push @courselist, "$course:Slot $courses{$course}{'slot'}:$courses{$course}{'name'}";
 
       print "</tr>\n";
     }
    
-    print "</table>\n";
+    print "</table></font>\n";
     print br;
+
+    print <<'EOF';
+<div style="background-color:#ffd; border:black solid
+2px;margin:1em;padding:5px">The slots indicate the day and the time in
+which the course will happen. Thus F1 is first slot on Friday or S4 is
+fourth slot on Saturday</div>
+EOF
 
    print
         "Number of courses: ", 
-          popup_menu(-name=>'ncourses', -values=>['1', '2', '3', '4']), br;
+          popup_menu(-name=>'ncourses', -values=>['-', '1', '2', '3', '4']), br;
    
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
@@ -581,7 +609,7 @@ sub print_electives_page ()
 
     print br, to_page('Submit Preferences'), br;
 
-    print end_html();
+    print local_end_html();
 
     return;
 }
@@ -623,7 +651,7 @@ sub update_db_with_preferences ($$$)
     
     unless ($dbh) {
       print br, "Error: unable to connect to database",
-        br, end_html();
+        br, local_end_html();
       return -1;
     }
     
@@ -644,7 +672,7 @@ sub update_db_with_preferences ($$$)
     if ($@) {
       # eval { $dbh->rollback() };
       print br, "Error: unable to update database: $@",
-        br, end_html();
+        br, local_end_html();
       return -1;
     }
 
@@ -655,13 +683,13 @@ sub update_db_with_preferences ($$$)
 
 sub print_ack_page ()
   {
-    print header(), start_html($title), h1($title);
+    print header(), start_html($title), h3($title);
     
     if (!defined(param('rollno')) ||
         !defined(param('authcode')) ||
         !defined(param('ncourses'))) {
     
-      print "Invalid input: please try again", end_html();
+      print "Invalid input: please try again", local_end_html();
       return;
     }
     
@@ -670,14 +698,10 @@ sub print_ack_page ()
     my $ncourses = param('ncourses');
    
     my $errors = load_students("$config_dir/students.txt");
-    if ($errors) {
-      print "Internal error: error loading students database", br, end_html();
-      return;
-    }
 
     unless (defined($students{$rollno})) {
       print br, "Error: roll number '$rollno' is not present in the database", 
-        br, end_html();
+        br, local_end_html();
       return;
     }
 
@@ -688,7 +712,7 @@ sub print_ack_page ()
         "If this is a valid roll number, please send e-mail to ",
         "<a href=\"mailto:pgsemelectives\@sankara.net\">pgsemelectives\@sankara.net</a>",
         " reporting the problem.", br,
-        br, end_html();
+        br, local_end_html();
       return;
     }
 
@@ -700,7 +724,7 @@ sub print_ack_page ()
     print br;
 
     unless ($ncourses =~ /[1234]/) {
-        print "Error: invalid number of courses", br, end_html();
+        print "Error: invalid number of courses", br, local_end_html();
         log_db("FAIL: preferences: invalid number of courses: rollno=$rollno");
         return;
     }
@@ -720,21 +744,21 @@ sub print_ack_page ()
 
       if ($sepfound && !($code =~ /^-/)) {
           print br, "Error: invalid set of preferences; preferences need to be contiguous",
-            br, end_html();
+            br, local_end_html();
           log_db("FAIL: preferences: invalid set of preferences: rollno=$rollno");
           return;
       }
 
       if (!($code =~ /^-/) && !$courses{$code}) {
           print br, "Error: invalid preference(s) such as '$code'",
-              br, end_html();
+              br, local_end_html();
           log_db("FAIL: preferences: invalid preferences: rollno=$rollno");
           return;
       }
 
       if ($choices{$code}) {
           print br, "Error: duplicate preferences",
-            br, end_html();
+            br, local_end_html();
           log_db("FAIL: preferences: duplicate preferences: rollno=$rollno");
           return;
       }
@@ -750,7 +774,7 @@ sub print_ack_page ()
     if ($ncourses > @choices) {
         print br, "Error: number of courses ($ncourses) is greater than ",
             "the number of preferences (", scalar(@choices), ") given.";
-        print br, end_html();
+        print br, local_end_html();
         return;
     }
 
@@ -798,11 +822,24 @@ sub print_ack_page ()
 
     print br;
 
-    print end_html();
+    print local_end_html();
   }
 
 sub main()
 {
+    # February 7, 2006, 00:00 hrs IST
+    # mktime(second, minute, hour, day, month-1, year-1900)
+
+    my $deadline = POSIX::mktime(0, 00, 00, 7, 1, 106);
+    if (time > $deadline) {
+      print header(), start_html($title), h3($title);
+
+      print "Electives submission deadline is over. ";
+      print "Please contact PGSEM office for further assistance. ";
+      print local_end_html();
+      return;
+    }
+
     my $page = param(".state") || "default";
 
     if ($states{$page}) {
