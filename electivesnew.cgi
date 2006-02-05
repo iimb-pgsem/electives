@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.10 2006/02/05 12:48:25 a14562 Exp $
+# $Id: electivesnew.cgi,v 1.1 2006/02/05 12:48:26 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
