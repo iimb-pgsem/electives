@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.8 2006/02/04 19:20:04 a14562 Exp $
+# $Id: electives.cgi,v 1.9 2006/02/05 06:11:24 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -260,7 +260,7 @@ sub send_mail($$$$$)
 
       unless ($smtp) {
         print "Transient error: unable to send e-mail; please try again after a few minutes";
-        log_db("FAIL: authrequest: error sending mail: SMTP: rollno=$rollno"); 
+        log_db("FAIL: smtp: $subject: rollno=$rollno"); 
         print local_end_html;
         return -1;
       }
@@ -289,18 +289,46 @@ sub send_mail($$$$$)
     } else {
 
       print "Error sending mail: unable to authenticate using POP3";
-      log_db("FAIL: authrequest: error sending mail: POP3: rollno=$rollno"); 
+      log_db("FAIL: pop3: $subject: rollno=$rollno"); 
       print local_end_html;
       return -1;
     }
 
     if ($errors) {
       print "Internal error: unable to send e-mail; please try again";
-      log_db("FAIL: authrequest: error sending mail: SMTP: rollno=$rollno"); 
+      log_db("FAIL: smtp: $subject: rollno=$rollno"); 
       print local_end_html;
       return -1;
     }
 
+    return 0;
+}
+
+sub send_mail_sendmail($$$$$)
+{
+    return 0 unless ($send_email);
+
+    my ($rollno, $from, $to, $subject, $body) = @_;
+
+    my $sendmail = "/usr/sbin/sendmail -t";
+
+    my $errors = 0;
+
+    my $status = open(SENDMAIL, "|$sendmail");
+    unless ($status) {
+      print "Transient error sending mail: please try again later after a few minutes";
+      log_db("FAIL: sendmail: $subject: rollno=$rollno"); 
+      print local_end_html;
+      return -1;
+    }
+
+    print SENDMAIL "From: $from\n";
+    print SENDMAIL "To: $to\n";
+    print SENDMAIL "Subject: $subject\n";
+    print SENDMAIL "X-CGIMailer: sendmail\n";
+    print SENDMAIL "Content-type: text/plain\n\n";
+    print SENDMAIL $body;
+    close(SENDMAIL);
     return 0;
 }
 
@@ -392,7 +420,7 @@ sub print_authentication_page()
     my $body = "Roll Number: $rollno\n\nPasscode: $code\n";
     my $to = $students{$rollno}{"email"};
 
-    my $rv = send_mail($rollno, $from, $to, $subject, $body);
+    my $rv = send_mail_sendmail($rollno, $from, $to, $subject, $body);
     return if ($rv != 0);
 
     log_db("OK: passcode_sent: rollno=$rollno code=$code");
@@ -804,7 +832,7 @@ sub print_ack_page ()
     $body .= "\n\n";
     my $to = $students{$rollno}{"email"};
 
-    $rv = send_mail($rollno, $from, $to, $subject, $body);
+    $rv = send_mail_sendmail($rollno, $from, $to, $subject, $body);
     return if ($rv != 0);
 
     print "Course preferences have been succesfully updated.", br;
