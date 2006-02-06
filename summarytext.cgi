@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summary.cgi,v 1.2 2006/02/06 21:17:23 a14562 Exp $
+# $Id: summarytext.cgi,v 1.1 2006/02/06 21:17:23 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>

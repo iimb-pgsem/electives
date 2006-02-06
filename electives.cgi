@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.10 2006/02/05 12:48:25 a14562 Exp $
+# $Id: electives.cgi,v 1.11 2006/02/06 21:17:23 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -200,14 +200,16 @@ sub print_login_page()
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
 students for applying for elective courses for the quarter starting
-Feb. 2006.<br>Submission deadline is 24:00 IST, Monday, 6 February, 2006.</div>
+Feb. 2006.<br>Submission deadline is 24:00 IST, Monday, 6 February, 2006.<br>
+<font color='red'>Submissions after the deadline will only be considered 
+subject to the PGSEM Chairperson's approval.</font></div>
 <div style="">The process of applying for the electives
 can be accomplished in three easy steps. These are as
 follows:<ol><li>Get a passcode: Use the form below, enter your roll
 number and press the "Get Passcode" button. A passcode will be e-mailed
 to you at your IIMB email id. This is necessary so as to ensure that no
 one else can enter elective choices on your behalf.</li> <li>Login: You
-can now login by entering your roll number and this passcode and
+can now login by entering <b>both</b> your roll number <b>and</b> this passcode and
 pressing the "Login" button. You will be sent to the elective choice
 page.</li><li>Choose: In the elective choice page, give your choices as
 per the priority (first course is highest priority) and submit the
@@ -876,10 +878,10 @@ sub print_ack_page ()
 
 sub main()
 {
-    # February 7, 2006, 00:00 hrs IST
+    # February 8, 2006, 00:00 hrs IST
     # mktime(second, minute, hour, day, month-1, year-1900)
 
-    my $deadline = POSIX::mktime(0, 00, 00, 7, 1, 106);
+    my $deadline = POSIX::mktime(0, 00, 00, 8, 1, 106);
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
