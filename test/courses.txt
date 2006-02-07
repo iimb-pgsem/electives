@@ -1,0 +1,9 @@
+# course code; course name; instructor(s); capacity; assigned slot
+
+C001; Course C001; Instructor C001; 20; 1
+C002; Course C002; Instructor C002; 20; 2
+C003; Course C003; Instructor C003; ; 3
+C004; Course C004; Instructor C004; ; 4
+C005; Course C005; Instructor C005; ; 4
+
+
