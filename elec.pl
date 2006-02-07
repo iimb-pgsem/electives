@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.6 2006/01/28 20:07:37 a14562 Exp $
+# $Id: elec.pl,v 1.7 2006/02/07 15:28:19 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -58,10 +58,12 @@ use strict;
 use Spreadsheet::WriteExcel;
 
 # constants
-my $default_cap = 70;
+my $default_cap = 65;
+my $default_cgpa = 3.0;
+
 my $max_cgpa = 4.0;
 my $min_cgpa_four_courses = 2.75;
-my $min_credits = 36; # TODO verify
+my $min_credits = 12; # TODO verify
 my $max_credits = 105; # TODO verify
 
 my $credits_pass = 93; 
@@ -116,6 +118,16 @@ my %allocation;
 # each studentlist element is hash reference where the hash holds
 # rollno, priority, cgpa
 
+# Excel properties
+my $rollno_width = 15;
+my $name_width = 35;
+my $email_width = 35;
+my $allotted_color = '#CCFFFF';
+my $capped_color = '#FFCC00';
+my $complete_color = '#C0C0C0';
+my $sc_color = '#FF00FF';
+my $ot_color = '#FF9900';
+
 sub err_print($)
 {
     my $msg = shift;
@@ -155,11 +167,6 @@ sub load_courses($)
 
         if (defined($cap) && (($cap < 1) || ($cap > $default_cap))) {
             err_print("error:$file:$.: invalid cap '$cap'");
-            next;
-        }
-
-        if (defined($slot) && !($slot =~ /[1234]/)) {
-            err_print("error:$file:$.: invalid slot '$slot' - must be [1234]");
             next;
         }
 
@@ -226,7 +233,7 @@ sub load_students($)
         my ($rollno, $name, $email, $cgpa, $credits) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
-        $cgpa = undef if (defined($cgpa) && ($cgpa eq ''));
+        $cgpa = $default_cgpa if (defined($cgpa) && ($cgpa eq ''));
         $credits = $min_credits if (defined($credits) && ($credits eq ''));
 
         if (!defined($rollno) || ($rollno eq "")) {
@@ -417,6 +424,32 @@ sub sort_by_rank
     }
 }
 
+sub get_allotted_course($$)
+{
+    my ($rec, $slot) = @_;
+    return undef if (!defined($slot));
+    my @cslots = split(/\s*,\s*/, $slot);
+    for my $s (@cslots) {
+
+        if (defined($students{$rec->{"rollno"}}{"slot"}{$s})) {
+
+            return $students{$rec->{"rollno"}}{"slot"}{$s};
+        }
+    }
+    return undef;
+}
+
+sub fill_student_slots($$$)
+{
+    my ($rollno, $slot, $course) = @_;
+    return if (!defined($slot));
+    my @cslots = split(/\s*,\s*/, $slot);
+    for my $s (@cslots) {
+
+        $students{$rollno}{"slot"}{$s} = $course;
+    }
+}
+
 sub allocate_course($$)
 {
     my ($rec, $course) = @_;
@@ -448,8 +481,8 @@ sub allocate_course($$)
 
     my $slot = $courses{$course}{"slot"};
 
-    my $already_allotted_course = $students{$rec->{"rollno"}}{"slot"}{$slot};
-    
+    my $already_allotted_course = get_allotted_course($rec, $slot);
+
     if (defined($already_allotted_course)) {
 
         $rec->{"allotted"} = 0;
@@ -459,7 +492,7 @@ sub allocate_course($$)
 
     $rec->{"allotted"} = 1;
     $rec->{"reason"} = "allotted";
-    $students{$rollno}{"slot"}{$slot} = $course;
+    fill_student_slots($rollno, $slot, $course);
     ++$choices{$rollno}{"nallotted"};
     ++$allocation{$course}{"nallotted"};
     return 1;
@@ -479,7 +512,7 @@ sub do_allocation ($)
 
     my $maxpriority = scalar(keys %courses);
 
-    for (my $priority = 1; $priority < $maxpriority; ++$priority) {
+    for (my $priority = 1; $priority <= $maxpriority; ++$priority) {
 
         foreach my $course (keys %allocation) {
             my @studentlist = @{$allocation{$course}{"studentlist"}};
@@ -539,46 +572,177 @@ sub print_allocation_by_course
     print "\n";
 }
 
+sub get_format
+{
+  my ($rec, $formats) = @_;
+
+  if ($rec->{'reason'} eq 'allotted') {
+    return $formats->[0];
+  }
+  if ($rec->{'reason'} eq 'capped') {
+    return $formats->[1];
+  }
+  if ($rec->{'reason'} eq 'complete') {
+    return $formats->[2];
+  }
+  if ($rec->{'reason'} =~ 'schedule_conflict') {
+    return $formats->[3];
+  }
+  if ($rec->{'reason'} eq 'onlythree') {
+    return $formats->[4];
+  }
+}
+
 sub write_excel
 {
-    my $workbook = Spreadsheet::WriteExcel->new("allocation.xls");
+    # Generate two workbooks, internal and external.
+    my $workbookint = Spreadsheet::WriteExcel->new("allocation-internal.xls");
+    my $workbookext = Spreadsheet::WriteExcel->new("allocation.xls");
 
-    my @header = ('Rank', 'Roll Number', 'Priority', 
-                  'Credits', 'CGPA', 'Status');
+    # color pallettes for both
+    $workbookint->set_custom_color(40, $allotted_color);
+    $workbookint->set_custom_color(41, $capped_color);
+    $workbookint->set_custom_color(42, $complete_color);
+    $workbookint->set_custom_color(43, $sc_color);
+    $workbookint->set_custom_color(44, $ot_color);
 
-    my $format = $workbook->add_format();
-    $format->set_bold();
+    $workbookext->set_custom_color(40, $allotted_color);
+    $workbookext->set_custom_color(41, $capped_color);
+    $workbookext->set_custom_color(42, $complete_color);
+    $workbookext->set_custom_color(43, $sc_color);
+    $workbookext->set_custom_color(44, $ot_color);
+
+    my $allotted_cfint = $workbookint->add_format(bg_color=>40);
+    my $capped_cfint = $workbookint->add_format(bg_color=>41);
+    my $complete_cfint = $workbookint->add_format(bg_color=>42);
+    my $sc_cfint = $workbookint->add_format(bg_color=>43);
+    my $ot_cfint = $workbookint->add_format(bg_color=>44);
+    my @intformats = ($allotted_cfint, $capped_cfint, $complete_cfint, $sc_cfint, $ot_cfint);
+
+    my $allotted_cfext = $workbookext->add_format(bg_color=>40);
+    my $capped_cfext = $workbookext->add_format(bg_color=>41);
+    my $complete_cfext = $workbookext->add_format(bg_color=>42);
+    my $sc_cfext = $workbookext->add_format(bg_color=>43);
+    my $ot_cfext = $workbookext->add_format(bg_color=>44);
+    my @extformats = ($allotted_cfext, $capped_cfext, $complete_cfext, $sc_cfext, $ot_cfext);
+
+    # Headers for both
+    my @headerint = ('Rank', 'Roll Number', 'Name', 'E-mail',
+                     'Priority', 'Credits', 'CGPA', 'Status');
+
+    my @headerext = ('Roll Number', 'Name', 'E-mail');
+
+    my $formatint = $workbookint->add_format();
+    $formatint->set_bold();
+    my $formatext = $workbookext->add_format();
+    $formatext->set_bold();
+
+    my $summaryint = $workbookint->add_worksheet("Summary");
+    my $summaryext = $workbookext->add_worksheet("Summary");
+    my $coursecount = 0;
+    my %studentrow;
+
+    $summaryint->write(0, 0, "Roll Number", $formatint);
+    $summaryint->set_column(0, 0, $rollno_width);
+    $summaryint->write(0, 1, "Name", $formatint);
+    $summaryint->set_column(1, 1, $name_width);
+
+    $summaryext->write(0, 0, "Roll Number", $formatext);
+    $summaryext->set_column(0, 0, $rollno_width);
+    $summaryext->write(0, 1, "Name", $formatext);
+    $summaryext->set_column(1, 1, $name_width);
+
+    my @courses = sort keys %allocation;
 
     foreach my $course (sort keys %allocation) {
 
-      my $sheet = $workbook->add_worksheet($course);
-    
-      my $row = 0;
-      my $col = 0;
+        print "Writing spreadsheet information for $course\n";
+        my $sheetint = $workbookint->add_worksheet($course);
+        my $sheetext = $workbookext->add_worksheet($course);
 
-      for ($col = 0; $col < @header; ++$col) {
-          $sheet->write($row, $col, $header[$col], $format);
-      }
+        $summaryint->write(0, $coursecount + 2, $course, $formatint);
+        $summaryext->write(0, $coursecount + 2, $course, $formatext);
 
-      $row = 1;
-      $col = 0;
+        my $row = 0;
+        my $col = 0;
 
-      my $count = 1;
+        for ($col = 0; $col < @headerint; ++$col) {
+            $sheetint->write($row, $col, $headerint[$col], $formatint);
+        }
 
-      foreach my $rec (@{$allocation{$course}{"studentlist"}}) {
+        for ($col = 0; $col < @headerext; ++$col) {
+            $sheetext->write($row, $col, $headerext[$col], $formatext);
+        }
 
-          $sheet->write($row, $col++, $count);
-          $sheet->write($row, $col++, $rec->{"rollno"});
-          $sheet->write($row, $col++, $rec->{"priority"});
-          $sheet->write($row, $col++, $rec->{"credits"});
-          $sheet->write($row, $col++, $rec->{"cgpa"});
-          $sheet->write($row, $col++, $rec->{"reason"});
+        $row = 1;
+        $col = 0;
 
-          ++$row;
-          ++$count;
-          $col = 0;
-      }
+        my $count = 1;
 
+        foreach my $rec (@{$allocation{$course}{"studentlist"}}) {
+
+            $sheetint->write($row, $col++, $count, get_format($rec, \@intformats));
+
+            $sheetint->set_column($col, $col, $rollno_width);
+            $sheetint->write($row, $col++, $rec->{"rollno"}, get_format($rec, \@intformats));
+            
+            $sheetint->set_column($col, $col, $name_width);
+            $sheetint->write($row, $col++, $students{$rec->{"rollno"}}{"name"}, get_format($rec, \@intformats));
+
+            $sheetint->set_column($col, $col, $email_width);
+            $sheetint->write($row, $col++, $students{$rec->{"rollno"}}{"email"}, get_format($rec, \@intformats));
+
+            $sheetint->write($row, $col++, $rec->{"priority"}, get_format($rec, \@intformats));
+            $sheetint->write($row, $col++, $rec->{"credits"}, get_format($rec, \@intformats));
+            $sheetint->write($row, $col++, $rec->{"cgpa"}, get_format($rec, \@intformats));
+            $sheetint->write($row, $col++, $rec->{"reason"}, get_format($rec, \@intformats));
+
+            $studentrow{$rec->{"rollno"}}->[$coursecount]
+              = ($rec->{"allotted"} == 1 ? 1 : undef);
+            ++$row;
+            ++$count;
+            $col = 0;
+        }
+
+        $row = 1;
+        $col = 0;
+
+        foreach my $rec (sort {$a->{"rollno"} cmp $b->{"rollno"}}
+                         @{$allocation{$course}{"studentlist"}}) {
+
+            if ($rec->{"allotted"} == 1) {
+
+                $sheetext->set_column($col, $col, $rollno_width);
+                $sheetext->write($row, $col++, $rec->{"rollno"});
+                $sheetext->set_column($col, $col, $name_width);
+                $sheetext->write($row, $col++, $students{$rec->{"rollno"}}{"name"});
+                $sheetext->set_column($col, $col, $email_width);
+                $sheetext->write($row, $col++, $students{$rec->{"rollno"}}{"email"});
+
+                ++$row;
+                $col = 0;
+            }
+        }
+        ++$coursecount;
+    }
+
+    my $row = 1;
+    foreach my $studentno (sort keys %studentrow) {
+
+        print "Writing summary for $studentno\n";
+        $summaryint->write($row, 0, $studentno);
+        $summaryint->write($row, 1, $students{$studentno}->{"name"});
+        $summaryext->write($row, 0, $studentno);
+        $summaryext->write($row, 1, $students{$studentno}->{"name"});
+        for (my $courseno = 0; $courseno < $coursecount; ++$courseno) {
+
+            if (defined($studentrow{$studentno}->[$courseno])) {
+
+                $summaryint->write($row, $courseno + 2, $courses[$courseno]);
+                $summaryext->write($row, $courseno + 2, $courses[$courseno]);
+            }
+        }
+        ++$row;
     }
 }
 
@@ -663,3 +827,4 @@ sub main
 main;
 
 # end of file
+
