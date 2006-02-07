@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summarytext.cgi,v 1.2 2006/02/06 21:37:50 a14562 Exp $
+# $Id: summarytext.cgi,v 1.3 2006/02/07 12:58:04 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -220,8 +220,8 @@ sub main()
 
     while ($sth->fetch()) {
       $choices{$rollno}{"ncourses"} = $ncourses;
-      $choices{$rollno}{"priority"}->{$priority} = $course;
-      $choices{$rollno}{"courses"}->{$course} = $priority;
+      $choices{$rollno}{"priority"}{$priority} = $course;
+      $choices{$rollno}{"courses"}{$course} = $priority;
     }
   
     $sth->finish();
@@ -232,9 +232,15 @@ sub main()
 
     foreach $rollno (sort keys %choices) {
 
+      my @courses;
+      for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
+        my $course = $choices{$rollno}{'priority'}{$priority};
+        push @courses, $course if ($course);
+      }
+
       print "$rollno; ";
       print "$choices{$rollno}{'ncourses'}; ";
-      print join(',', @{$choices{$rollno}{'priority'}}{sort keys %{$choices{$rollno}{'priority'}}});
+      print join(',', @courses);
       print "\n";
     }
 }
