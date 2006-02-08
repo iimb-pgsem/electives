@@ -10,3 +10,4 @@ IPRs;IPRs: Innovation and Hi-Tech Entrepreneurial Competitiveness;A Damodaran & 
 VEIL;Venturing through Entrepreneurial / Intrapreneurial Leadership;DVR Seshadri & P Muralidhar;;F3,S3
 FL;French Language;Lakshmi Suryanarayan;;F3,S3
 EEE;Embedding Evolutionary Excellence;J M Sampath;;F2,S2
+
