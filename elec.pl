@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.7 2006/02/07 15:28:19 a14562 Exp $
+# $Id: elec.pl,v 1.8 2006/02/08 19:02:12 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -117,6 +117,9 @@ my %allocation;
 # 
 # each studentlist element is hash reference where the hash holds
 # rollno, priority, cgpa
+
+my @ranklist; 
+# ranklist covering all students (not specific to courses)
 
 # Excel properties
 my $rollno_width = 15;
@@ -369,6 +372,27 @@ sub print_choices ()
             join(',', @{$choices{$rollno}{"courselist"}})), "\n";
     }
     print "\n";
+}
+
+sub by_student_rank
+{
+    my $retval;
+
+    if ($give_priority_to_seniors) {
+        $retval = $students{$a}{"seniority"} <=> 
+                  $students{$b}{"seniority"};
+        return $retval if ($retval != 0);
+    }
+
+    if ($give_priority_to_cgpa) {
+        if (defined($students{$a}{"cgpa"}) && defined($students{$b}{"cgpa"})) {
+            $retval = ($students{$b}{"cgpa"} <=> $students{$a}{"cgpa"});
+            return $retval if ($retval != 0);
+        }
+    }
+
+    $retval = $a <=> $b;
+    return $retval;
 }
 
 sub by_rank ($)
@@ -746,6 +770,85 @@ sub write_excel
     }
 }
 
+sub write_choices_excel ($$) 
+{
+    my $filename = shift;
+    my $show_results = shift;
+
+    @ranklist = sort { by_student_rank } (keys %students);
+    print join("\n", @ranklist);
+
+    my $workbook = Spreadsheet::WriteExcel->new($filename);
+    my $sheet = $workbook->add_worksheet("Choices");
+
+    # color pallettes for both
+    $workbook->set_custom_color(40, $allotted_color);
+    $workbook->set_custom_color(41, $capped_color);
+    $workbook->set_custom_color(42, $complete_color);
+    $workbook->set_custom_color(43, $sc_color);
+    $workbook->set_custom_color(44, $ot_color);
+
+    my $allotted_cf = $workbook->add_format(bg_color=>40);
+    my $capped_cf = $workbook->add_format(bg_color=>41);
+    my $complete_cf = $workbook->add_format(bg_color=>42);
+    my $sc_cf = $workbook->add_format(bg_color=>43);
+    my $ot_cf = $workbook->add_format(bg_color=>44);
+    my @formats = ($allotted_cf, $capped_cf, $complete_cf, $sc_cf, $ot_cf);
+
+    my $formatbold = $workbook->add_format();
+    $formatbold->set_bold();
+
+    my $row = 0;
+    my $col = 0;
+
+    $sheet->write($row, $col++, "Rank", $formatbold);
+
+    $sheet->set_column($col, $col, $rollno_width);
+    $sheet->write($row, $col++, "Roll Number", $formatbold);
+
+    $sheet->set_column($col, $col, $name_width);
+    $sheet->write($row, $col++, "Name", $formatbold);
+
+    $sheet->write($row, $col++, "Credits", $formatbold);
+    $sheet->write($row, $col++, "CGPA", $formatbold);
+    $sheet->write($row, $col++, "#Courses", $formatbold);
+
+    for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
+      $sheet->write($row, $col++, "P$priority", $formatbold);
+      $sheet->write($row, $col++, "P$priority Status", $formatbold) if $show_results;
+    }
+
+    ++$row;
+    $col = 0;
+
+    foreach my $rollno (@ranklist) {
+
+      next unless $choices{$rollno};
+
+      $sheet->write($row, $col++, $row+1);
+      $sheet->write($row, $col++, $rollno);
+      $sheet->write($row, $col++, $students{$rollno}{'name'});
+      $sheet->write($row, $col++, $students{$rollno}{'credits'});
+      $sheet->write($row, $col++, $students{$rollno}{'cgpa'});
+      $sheet->write($row, $col++, $choices{$rollno}{'ncourses'});
+
+      for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
+        my $course = $choices{$rollno}{'courselist'}->[$priority-1];
+        if ($course) {
+          my $rec = $allocation{$course}{"rollno"}{$rollno};
+          $sheet->write($row, $col++, $course, $show_results ? get_format($rec, \@formats) : undef);
+          $sheet->write($row, $col++, $rec->{'reason'}, get_format($rec, \@formats)) if $show_results;
+        } else {
+          $col++;
+          $col++ if $show_results;
+        }
+      }
+
+      ++$row;
+      $col = 0;
+    }
+}
+
 sub print_allocation_by_student
 {
     print "=== Allocation by student ===\n";
@@ -822,6 +925,8 @@ sub main
     compute_conflicts;
 
     write_excel();
+    write_choices_excel("choices.xls", 0);
+    write_choices_excel("choices-and-results.xls", 1);
 }
 
 main;
