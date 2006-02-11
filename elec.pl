@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.9 2006/02/11 18:26:23 a14562 Exp $
+# $Id: elec.pl,v 1.10 2006/02/11 19:22:06 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -102,6 +102,8 @@ my %students;
 # name, email are never undef but can be ''
 # cgpa can be undef
 
+my %project_students;
+
 my %choices;
 # choices hash:
 # key is rollno; exists in students hash
@@ -148,6 +150,24 @@ sub skip_line($)
     return 1 if ($line =~ /^\s*\#/); # comment lines
     return 1 if ($line =~ /^\s*$/); # blank lines
     return 0;
+}
+
+# load roll numbers of students doing projects
+sub load_project_students ($)
+{
+    my $filename = shift;
+
+    open IN, "<$filename" or die "Can't open $filename: $!";
+
+    while (<IN>) {
+       chomp;
+       s/^\s*//g;
+       s/\s*$//g;
+       $project_students{$_} = 1;
+       print STDERR "*** Project student: $_\n";
+    }
+
+    close IN;
 }
 
 sub load_courses($)
@@ -504,10 +524,17 @@ sub allocate_course($$)
         return 0;
     }
 
-    if (($choices{$rollno}{"nallotted"} == 3) &&
+    my $allowed = $max_courses - 
+        (defined($project_students{$rec->{'rollno'}}) ? 1 : 0);
+
+
+    if (($choices{$rollno}{"nallotted"} == $allowed - 1) &&
         ($students{$rollno}{'cgpa'} < $min_cgpa_four_courses)) {
+
+        print STDERR "*** $rec->{'rollno'}\n" if ($allowed == 3);
+
         $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "OnlyThree";
+        $rec->{"reason"} = "Allowed:" . ($allowed-1);
         return 0;
     }
 
@@ -632,7 +659,7 @@ sub get_format
   if ($rec->{'reason'} =~ 'SC') {
     return $formats->[3];
   }
-  if ($rec->{'reason'} eq 'OnlyThree') {
+  if ($rec->{'reason'} =~ 'Allowed') {
     return $formats->[4];
   }
   if ($rec->{'reason'} eq 'Dropped') {
@@ -973,6 +1000,7 @@ sub main
     print_courses;
 
     load_students("students.txt");
+    load_project_students("project_students.txt");
     print_students;
 
     load_choices("choices.txt");
