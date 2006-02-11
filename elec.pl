@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.8 2006/02/08 19:02:12 a14562 Exp $
+# $Id: elec.pl,v 1.9 2006/02/11 18:26:23 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -57,14 +57,17 @@ use strict;
 
 use Spreadsheet::WriteExcel;
 
+my $title = "PGSEM 2005-06 Q4";
+my $footer = "Indian Institute of Management, Bangalore";
+
 # constants
 my $default_cap = 65;
-my $default_cgpa = 3.0;
+my $default_status = 'R'; # running
+my $default_cgpa = 3.0; # CGPA used for allocation if data not available
 
 my $max_cgpa = 4.0;
 my $min_cgpa_four_courses = 2.75;
-my $min_credits = 12; # TODO verify
-my $max_credits = 105; # TODO verify
+my $min_credits = 0; 
 
 my $credits_pass = 93; 
 # >=93 credits already taken => no seniority preference
@@ -125,11 +128,13 @@ my @ranklist;
 my $rollno_width = 15;
 my $name_width = 35;
 my $email_width = 35;
+
 my $allotted_color = '#CCFFFF';
 my $capped_color = '#FFCC00';
 my $complete_color = '#C0C0C0';
 my $sc_color = '#FF00FF';
 my $ot_color = '#FF9900';
+my $dropped_color = '#008080';
 
 sub err_print($)
 {
@@ -152,11 +157,13 @@ sub load_courses($)
     while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($code, $name, $instructor, $cap, $slot) = 
+        my ($code, $name, $instructor, $cap, $slot, $status) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $cap = undef if (defined($cap) && ($cap eq ''));
         $slot = undef if (defined($slot) && ($slot eq ''));
+        $status = undef if (defined($status) && ($status eq ''));
+        # status can be 'A' (active) or 'D' dropped
 
         if (!defined($code) || ($code eq "")) {
             err_print("error:$file:$.: no course code");
@@ -168,19 +175,26 @@ sub load_courses($)
             next;
         }
 
-        if (defined($cap) && (($cap < 1) || ($cap > $default_cap))) {
+        if (defined($cap) && ($cap < 1)) {
             err_print("error:$file:$.: invalid cap '$cap'");
+            next;
+        }
+
+        if (defined($status) && !($status =~ /[AD]/)) {
+            err_print("error:$file:$.: invalid status '$status'");
             next;
         }
 
         $name ||= "";
         $instructor ||= "";
         $cap ||= $default_cap;
+        $status ||= $default_status;
 
         $courses{$code}{"name"} = $name;
         $courses{$code}{"instructor"} = $instructor;
         $courses{$code}{"cap"} = $cap;
         $courses{$code}{"slot"} = $slot;
+        $courses{$code}{"status"} = $status;
 
     }
     close IN;
@@ -257,7 +271,7 @@ sub load_students($)
             next;
         }
 
-        if (defined($credits) && (($credits < $min_credits) || ($cgpa > $max_credits))) {
+        if (defined($credits) && ($credits < $min_credits)) {
             err_print("error:$file:$.: invalid credits '$credits'");
             ++$errors;
             next;
@@ -287,7 +301,7 @@ sub print_students ()
             $students{$rollno}{"name"},
             $students{$rollno}{"email"},
             $students{$rollno}{"cgpa"},
-            $students{$rollno}{"credits"} || ""), "\n";
+            $students{$rollno}{"credits"}), "\n";
     }
     print "\n";
 }
@@ -414,8 +428,8 @@ sub by_rank ($)
         }
         if ($retval == 0) {
             $retval = $a->{"rollno"} <=> $b->{"rollno"};
-            err_print("warning: roll number based ranking: " .
-                "'$course': $a->{'rollno'},$b->{'rollno'}");
+            # err_print("warning: roll number based ranking: " .
+            #   "'$course': $a->{'rollno'},$b->{'rollno'}");
         }
     }
 
@@ -486,20 +500,26 @@ sub allocate_course($$)
 
     if ($choices{$rollno}{"nallotted"} >= $choices{$rollno}{"ncourses"}) {
         $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "complete";
+        $rec->{"reason"} = "Complete";
         return 0;
     }
 
     if (($choices{$rollno}{"nallotted"} == 3) &&
         ($students{$rollno}{'cgpa'} < $min_cgpa_four_courses)) {
         $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "onlythree";
+        $rec->{"reason"} = "OnlyThree";
+        return 0;
+    }
+
+    if ($courses{$course}{"status"} eq 'D') {
+        $rec->{"allotted"} = 0;
+        $rec->{"reason"} = "Dropped";
         return 0;
     }
 
     if ($allocation{$course}{"nallotted"} >= $courses{$course}{"cap"}) {
         $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "capped";
+        $rec->{"reason"} = "Capped";
         return 0;
     }
 
@@ -510,12 +530,12 @@ sub allocate_course($$)
     if (defined($already_allotted_course)) {
 
         $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "schedule_conflict: $already_allotted_course";
+        $rec->{"reason"} = "SC:$already_allotted_course";
         return 0;
     }
 
     $rec->{"allotted"} = 1;
-    $rec->{"reason"} = "allotted";
+    $rec->{"reason"} = "Allotted";
     fill_student_slots($rollno, $slot, $course);
     ++$choices{$rollno}{"nallotted"};
     ++$allocation{$course}{"nallotted"};
@@ -600,20 +620,23 @@ sub get_format
 {
   my ($rec, $formats) = @_;
 
-  if ($rec->{'reason'} eq 'allotted') {
+  if ($rec->{'reason'} eq 'Allotted') {
     return $formats->[0];
   }
-  if ($rec->{'reason'} eq 'capped') {
+  if ($rec->{'reason'} eq 'Capped') {
     return $formats->[1];
   }
-  if ($rec->{'reason'} eq 'complete') {
+  if ($rec->{'reason'} eq 'Complete') {
     return $formats->[2];
   }
-  if ($rec->{'reason'} =~ 'schedule_conflict') {
+  if ($rec->{'reason'} =~ 'SC') {
     return $formats->[3];
   }
-  if ($rec->{'reason'} eq 'onlythree') {
+  if ($rec->{'reason'} eq 'OnlyThree') {
     return $formats->[4];
+  }
+  if ($rec->{'reason'} eq 'Dropped') {
+    return $formats->[5];
   }
 }
 
@@ -629,40 +652,61 @@ sub write_excel
     $workbookint->set_custom_color(42, $complete_color);
     $workbookint->set_custom_color(43, $sc_color);
     $workbookint->set_custom_color(44, $ot_color);
+    $workbookint->set_custom_color(45, $dropped_color);
 
     $workbookext->set_custom_color(40, $allotted_color);
     $workbookext->set_custom_color(41, $capped_color);
     $workbookext->set_custom_color(42, $complete_color);
     $workbookext->set_custom_color(43, $sc_color);
     $workbookext->set_custom_color(44, $ot_color);
+    $workbookext->set_custom_color(45, $dropped_color);
 
     my $allotted_cfint = $workbookint->add_format(bg_color=>40);
     my $capped_cfint = $workbookint->add_format(bg_color=>41);
     my $complete_cfint = $workbookint->add_format(bg_color=>42);
     my $sc_cfint = $workbookint->add_format(bg_color=>43);
     my $ot_cfint = $workbookint->add_format(bg_color=>44);
-    my @intformats = ($allotted_cfint, $capped_cfint, $complete_cfint, $sc_cfint, $ot_cfint);
+    my $dropped_cfint = $workbookint->add_format(bg_color=>45);
+    my @intformats = ($allotted_cfint, $capped_cfint, $complete_cfint, 
+                      $sc_cfint, $ot_cfint, $dropped_cfint);
 
     my $allotted_cfext = $workbookext->add_format(bg_color=>40);
     my $capped_cfext = $workbookext->add_format(bg_color=>41);
     my $complete_cfext = $workbookext->add_format(bg_color=>42);
     my $sc_cfext = $workbookext->add_format(bg_color=>43);
     my $ot_cfext = $workbookext->add_format(bg_color=>44);
-    my @extformats = ($allotted_cfext, $capped_cfext, $complete_cfext, $sc_cfext, $ot_cfext);
+    my $dropped_cfext = $workbookext->add_format(bg_color=>45);
+    my @extformats = ($allotted_cfext, $capped_cfext, $complete_cfext, 
+                      $sc_cfext, $ot_cfext, $dropped_cfext);
 
     # Headers for both
-    my @headerint = ('Rank', 'Roll Number', 'Name', 'E-mail',
+    my @headerint = ('Rank', 'Alloc No', 'Roll Number', 'Name', 'E-mail',
                      'Priority', 'Credits', 'CGPA', 'Status');
 
-    my @headerext = ('Roll Number', 'Name', 'E-mail');
+    my @headerext = ('SNo', 'Roll Number', 'Name', 'E-mail');
 
     my $formatint = $workbookint->add_format();
     $formatint->set_bold();
     my $formatext = $workbookext->add_format();
     $formatext->set_bold();
 
+    write_choices_excel($workbookint, "Choices", 0, \@intformats);
+    write_choices_excel($workbookint, "Allocation", 1, \@intformats);
+
     my $summaryint = $workbookint->add_worksheet("Summary");
+    $summaryint->set_paper(9);
+    $summaryint->set_landscape();
+    $summaryint->fit_to_pages(1);
+    $summaryint->set_header("&C$title: &A");
+    $summaryint->set_footer("&C$footer&R&P of &N");
+
     my $summaryext = $workbookext->add_worksheet("Summary");
+    $summaryext->set_paper(9);
+    $summaryext->set_landscape();
+    $summaryext->fit_to_pages(1);
+    $summaryext->set_header("&C$title: &A");
+    $summaryext->set_footer("&C$footer&A&R&P of &N");
+
     my $coursecount = 0;
     my %studentrow;
 
@@ -670,22 +714,35 @@ sub write_excel
     $summaryint->set_column(0, 0, $rollno_width);
     $summaryint->write(0, 1, "Name", $formatint);
     $summaryint->set_column(1, 1, $name_width);
+    $summaryint->write(0, 2, "#Courses", $formatint);
 
     $summaryext->write(0, 0, "Roll Number", $formatext);
     $summaryext->set_column(0, 0, $rollno_width);
     $summaryext->write(0, 1, "Name", $formatext);
     $summaryext->set_column(1, 1, $name_width);
+    $summaryext->write(0, 2, "#Courses", $formatext);
 
-    my @courses = sort keys %allocation;
+    foreach my $course (sort keys %courses) {
 
-    foreach my $course (sort keys %allocation) {
+        next if ($courses{$course}{"status"} eq 'D');
 
         print "Writing spreadsheet information for $course\n";
         my $sheetint = $workbookint->add_worksheet($course);
-        my $sheetext = $workbookext->add_worksheet($course);
+        $sheetint->set_paper(9);
+        $sheetint->set_portrait();
+        $sheetint->fit_to_pages(1);
+        $sheetint->set_header("&C$title: &A");
+        $sheetint->set_footer("&C$footer&R&P of &N");
 
-        $summaryint->write(0, $coursecount + 2, $course, $formatint);
-        $summaryext->write(0, $coursecount + 2, $course, $formatext);
+        my $sheetext = $workbookext->add_worksheet($course);
+        $sheetext->set_paper(9);
+        $sheetext->set_portrait();
+        $sheetext->fit_to_pages(1);
+        $sheetext->set_header("&C$title: &A");
+        $sheetext->set_footer("&C$footer&R&P of &N");
+
+        $summaryint->write(0, $coursecount + 3, $course, $formatint);
+        $summaryext->write(0, $coursecount + 3, $course, $formatext);
 
         my $row = 0;
         my $col = 0;
@@ -702,10 +759,12 @@ sub write_excel
         $col = 0;
 
         my $count = 1;
+        my $allocno = 1;
 
         foreach my $rec (@{$allocation{$course}{"studentlist"}}) {
 
             $sheetint->write($row, $col++, $count, get_format($rec, \@intformats));
+            $sheetint->write($row, $col++, ($rec->{'allotted'} ? $allocno++ : ""), get_format($rec, \@intformats));
 
             $sheetint->set_column($col, $col, $rollno_width);
             $sheetint->write($row, $col++, $rec->{"rollno"}, get_format($rec, \@intformats));
@@ -721,8 +780,8 @@ sub write_excel
             $sheetint->write($row, $col++, $rec->{"cgpa"}, get_format($rec, \@intformats));
             $sheetint->write($row, $col++, $rec->{"reason"}, get_format($rec, \@intformats));
 
-            $studentrow{$rec->{"rollno"}}->[$coursecount]
-              = ($rec->{"allotted"} == 1 ? 1 : undef);
+            $studentrow{$rec->{"rollno"}}{$course} =
+              ($rec->{"allotted"} == 1 ? 1 : undef);
             ++$row;
             ++$count;
             $col = 0;
@@ -736,6 +795,8 @@ sub write_excel
 
             if ($rec->{"allotted"} == 1) {
 
+                $sheetext->set_column($col, $col, $rollno_width);
+                $sheetext->write($row, $col++, $row);
                 $sheetext->set_column($col, $col, $rollno_width);
                 $sheetext->write($row, $col++, $rec->{"rollno"});
                 $sheetext->set_column($col, $col, $name_width);
@@ -753,47 +814,45 @@ sub write_excel
     my $row = 1;
     foreach my $studentno (sort keys %studentrow) {
 
-        print "Writing summary for $studentno\n";
+        # print "Writing summary for $studentno\n";
         $summaryint->write($row, 0, $studentno);
         $summaryint->write($row, 1, $students{$studentno}->{"name"});
+        $summaryint->write($row, 2, $choices{$studentno}->{"nallotted"});
+
         $summaryext->write($row, 0, $studentno);
         $summaryext->write($row, 1, $students{$studentno}->{"name"});
-        for (my $courseno = 0; $courseno < $coursecount; ++$courseno) {
+        $summaryext->write($row, 2, $choices{$studentno}->{"nallotted"});
+       
+        my $courseno = 0;
+        foreach my $course (sort keys %courses) {
+            
+            next if ($courses{$course}{'status'} eq 'D');
 
-            if (defined($studentrow{$studentno}->[$courseno])) {
+            if (defined($studentrow{$studentno}{$course})) {
 
-                $summaryint->write($row, $courseno + 2, $courses[$courseno]);
-                $summaryext->write($row, $courseno + 2, $courses[$courseno]);
+                $summaryint->write($row, $courseno + 3, $course);
+                $summaryext->write($row, $courseno + 3, $course);
             }
+
+            ++$courseno;
         }
         ++$row;
     }
 }
 
-sub write_choices_excel ($$) 
+sub write_choices_excel ($$$$) 
 {
-    my $filename = shift;
+    my $workbook = shift;
+    my $worksheet_name = shift;
     my $show_results = shift;
+    my $formats = shift;
 
-    @ranklist = sort { by_student_rank } (keys %students);
-    print join("\n", @ranklist);
-
-    my $workbook = Spreadsheet::WriteExcel->new($filename);
-    my $sheet = $workbook->add_worksheet("Choices");
-
-    # color pallettes for both
-    $workbook->set_custom_color(40, $allotted_color);
-    $workbook->set_custom_color(41, $capped_color);
-    $workbook->set_custom_color(42, $complete_color);
-    $workbook->set_custom_color(43, $sc_color);
-    $workbook->set_custom_color(44, $ot_color);
-
-    my $allotted_cf = $workbook->add_format(bg_color=>40);
-    my $capped_cf = $workbook->add_format(bg_color=>41);
-    my $complete_cf = $workbook->add_format(bg_color=>42);
-    my $sc_cf = $workbook->add_format(bg_color=>43);
-    my $ot_cf = $workbook->add_format(bg_color=>44);
-    my @formats = ($allotted_cf, $capped_cf, $complete_cf, $sc_cf, $ot_cf);
+    my $sheet = $workbook->add_worksheet($worksheet_name);
+    $sheet->set_paper(9);
+    $sheet->set_landscape(1);
+    $sheet->fit_to_pages(1);
+    $sheet->set_header("&C$title: &A");
+    $sheet->set_footer("&C$footer&R&P of &N");
 
     my $formatbold = $workbook->add_format();
     $formatbold->set_bold();
@@ -811,7 +870,8 @@ sub write_choices_excel ($$)
 
     $sheet->write($row, $col++, "Credits", $formatbold);
     $sheet->write($row, $col++, "CGPA", $formatbold);
-    $sheet->write($row, $col++, "#Courses", $formatbold);
+    $sheet->write($row, $col++, "Asked", $formatbold);
+    $sheet->write($row, $col++, "Allotted", $formatbold) if $show_results;
 
     for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
       $sheet->write($row, $col++, "P$priority", $formatbold);
@@ -825,19 +885,20 @@ sub write_choices_excel ($$)
 
       next unless $choices{$rollno};
 
-      $sheet->write($row, $col++, $row+1);
+      $sheet->write($row, $col++, $row);
       $sheet->write($row, $col++, $rollno);
       $sheet->write($row, $col++, $students{$rollno}{'name'});
       $sheet->write($row, $col++, $students{$rollno}{'credits'});
       $sheet->write($row, $col++, $students{$rollno}{'cgpa'});
       $sheet->write($row, $col++, $choices{$rollno}{'ncourses'});
+      $sheet->write($row, $col++, $choices{$rollno}{'nallotted'}) if $show_results;
 
       for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
         my $course = $choices{$rollno}{'courselist'}->[$priority-1];
         if ($course) {
           my $rec = $allocation{$course}{"rollno"}{$rollno};
-          $sheet->write($row, $col++, $course, $show_results ? get_format($rec, \@formats) : undef);
-          $sheet->write($row, $col++, $rec->{'reason'}, get_format($rec, \@formats)) if $show_results;
+          $sheet->write($row, $col++, $course, $show_results ? get_format($rec, $formats) : undef);
+          $sheet->write($row, $col++, $rec->{'reason'}, get_format($rec, $formats)) if $show_results;
         } else {
           $col++;
           $col++ if $show_results;
@@ -924,9 +985,11 @@ sub main
 
     compute_conflicts;
 
+    @ranklist = sort { by_student_rank } (keys %students);
+    print join("\n", @ranklist);
+    print "\n";
+
     write_excel();
-    write_choices_excel("choices.xls", 0);
-    write_choices_excel("choices-and-results.xls", 1);
 }
 
 main;
