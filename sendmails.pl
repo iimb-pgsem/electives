@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: sendmails.pl,v 1.1 2006/02/12 11:39:15 a14562 Exp $
+# $Id: sendmails.pl,v 1.2 2006/02/12 11:50:08 a14562 Exp $
 
 use strict;
 
@@ -71,13 +71,16 @@ sub main
         close IN;
 
         my @emails = grep(/^E-Mail: /, @lines);
-        my $email = $1 if ($emails[0] =~ /E-Mail: (.+)/);
+        my $email = $1 if ($emails[0] =~ /^E-Mail: (.+)/);
+   
+        my @names = grep(/^Name: /, @lines);
+        my $name = $1 if ($names[0] =~ /^Name: (.+)/);
    
         print "$file: Sending mail to $email: ";
         
         eval {
             send_mail("PGSEM Electives <pgsemelectives\@sankara.net>",
-                      $email,
+                      "$name <$email>",
                       "Course allotment results",
                       join("", @lines),
                       "allocation.xls");
