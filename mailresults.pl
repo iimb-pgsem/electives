@@ -1,6 +1,6 @@
 #perl -w
 
-# $Id: mailresults.pl,v 1.2 2006/02/12 10:13:42 a14562 Exp $
+# $Id: mailresults.pl,v 1.3 2006/02/12 11:49:30 a14562 Exp $
 
 use strict;
 
@@ -126,7 +126,9 @@ sub write_mailbody_files($)
         open OUT, ">$file" or die "Can't write $file: $!";
         
         print OUT 
-        "\n\nPlease find the results of the course allocation below:\n\n";
+        "\n\nPlease find the results of the course allocation below:\n";
+        print OUT
+        "(Overall results are available in the attached spread sheet.)\n\n";
 
         print OUT "Roll number: $rollno\n";
         print OUT "Name: $allocation{$rollno}{'name'}\n";
@@ -156,6 +158,7 @@ sub write_mailbody_files($)
         
         print OUT<<'EOF';
 
+
 For any clarifications regarding the allocation, 
 please get in touch with the PGSEM office.
 
@@ -164,6 +167,7 @@ on the the preferences submission, allocation, and
 communication processes at:
 
 http://sankara.net/cgi-bin/feedback.cgi
+
 
 Legend:
 =======
