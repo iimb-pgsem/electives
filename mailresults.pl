@@ -1,5 +1,7 @@
 #perl -w
 
+# $Id: mailresults.pl,v 1.2 2006/02/12 10:13:42 a14562 Exp $
+
 use strict;
 
 use POSIX;
