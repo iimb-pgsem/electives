@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.10 2006/02/11 19:22:06 a14562 Exp $
+# $Id: elec.pl,v 1.11 2006/02/12 11:48:43 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -538,6 +538,16 @@ sub allocate_course($$)
         return 0;
     }
 
+    if (($choices{$rollno}{"nallotted"} == $allowed) &&
+        ($allowed < $max_courses)) {
+
+        print STDERR "*** $rec->{'rollno'}\n" if ($allowed == 3);
+
+        $rec->{"allotted"} = 0;
+        $rec->{"reason"} = "Allowed:" . ($allowed-1);
+        return 0;
+    }
+
     if ($courses{$course}{"status"} eq 'D') {
         $rec->{"allotted"} = 0;
         $rec->{"reason"} = "Dropped";
@@ -951,6 +961,29 @@ sub print_allocation_by_student
     print "\n";
 }
 
+sub write_allocation_by_student ($)
+{
+    my $filename = shift;
+
+    open OUT, ">$filename" or die "Can't open $filename: $!";
+
+    foreach my $rollno (sort keys %choices) {
+        print OUT "$rollno; ";
+        print OUT "$students{$rollno}{'name'}; ";
+        print OUT "$students{$rollno}{'email'}; ";
+        print OUT "$choices{$rollno}{'ncourses'}; ";
+        print OUT "$choices{$rollno}{'nallotted'}; ";
+
+        foreach my $course (@{$choices{$rollno}{"courselist"}}) {
+            print OUT "$course=", 
+                $allocation{$course}{"rollno"}{$rollno}->{"reason"} || "", ",";
+        }
+        print OUT "\n";
+    }
+    close OUT;
+}
+
+
 sub get_students_for_course($$)
 {
   my $course = shift;
@@ -1018,6 +1051,8 @@ sub main
     print "\n";
 
     write_excel();
+
+    write_allocation_by_student("allocation-internal.txt");
 }
 
 main;
