@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: sendmails.pl,v 1.2 2006/02/12 11:50:08 a14562 Exp $
+# $Id: sendmails.pl,v 1.3 2006/04/30 08:00:35 a14562 Exp $
 
 use strict;
 
@@ -12,7 +12,7 @@ my $pop_required = 1;
 my $login = 'sankara';
 my $password = 'brealy16myers';
 
-my $debug = 0;
+my $debug = 1;
 
 sub send_mail ($$$$$)
 {

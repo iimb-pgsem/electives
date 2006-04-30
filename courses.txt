@@ -1,13 +1,19 @@
-AMRM;Advanced Market Research  & Models;Srinivas Prakhya;;F1,S1;A
-SMM;Services Marketing & Management;Anand Kasturi;;S4,S5;A
-CMS;Competitive Marketing Strategy;NB Kanagal;60;F2,S2;A
-NEF;New Enterprise Financing;G Sabarinathan;68;F2,S2;A
-M&A;Mergers and Acquisition;Utkarsh Mazumdar;60;S4,S5;A
-MOSIT;Managing Off shored Software & IT Services;S Krishna;;S1,S2;D
-QSM;Quantitative Software Management;J Veeraraghavan;;F1,S1;A
-LCM;Leadership and Change Management;Amit Chatterjee;60;S4,S5;D
-IPRs;IPRs: Innovation and Hi-Tech Entrepreneurial Competitiveness;A Damodaran & T Ramakrishna;60;F1,S1;A
-VEIL;Venturing through Entrepreneurial / Intrapreneurial Leadership;DVR Seshadri & P Muralidhar;68;F3,S3;A
-FL;French Language;Lakshmi Suryanarayan;;F3,S3;A
-EEE;Embedding Evolutionary Excellence;J M Sampath;;F2,S2;D
-
+MITSTP;Managing Innovation: Technology Strategy in Theory and Practice;Rajeev S;60;;;B+C; 
+FSAB;Financial Statement Analysis - BLR;N R Parasuraman;70;;;B; 
+FSAC;Financial Statement Analysis - Chennai;G Balasubramanian;;;;C; 
+NEF;New Enterprise Financing;G Sabarinathan;;;;B;2005
+INVB;Investments - BLR;MS Narasimhan;65;;;B; 
+INVC;Investments - Chennai;G Ramachandran;;;;C; 
+OPT;Options;Ramon Rabinovitch ;70;;;B+C; 
+BTBMM;Business to Business Market Management;DVR Seshadri;70;;;B+C; 
+PIE;Personal and Interpersonal Effectiveness;C Manohar Reddy;20;;;B; 
+CRHD;Corporate Restructuring & Human Dimensions (+PGP);V Anand Ram;14;;;B; 
+SCMB;Supply Chain Management - BLR;Jay Jayaram;65;;;B; 
+SCMC;Supply Chain Management - Chennai;Balasubramanian;;;;C; 
+OS;Operations Strategy (+PGP);LS Murthy;26;;;B+C; 
+TI;Telecom Industry;G Venkatesh;40;;;B+C; 
+SPM;Software Project Management;Shankar Venkatagiri;60;;;B+C; 
+NVC;New Venture Creation;Smita Ramakrishna;40;;;B+C; 
+KM;Knowledge Management;T Srikantaiah;70;;;B+C; 
+SSIPT;Six Sigma Integrated Program Management;Madhava Vemuri;65;;;B+C; 
+JL;Japanese Language ;Faculty from NAVIS;;;;B; 
