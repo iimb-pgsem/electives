@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.11 2006/02/06 21:17:23 a14562 Exp $
+# $Id: electives.cgi,v 1.12 2006/04/30 13:24:31 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -29,7 +29,7 @@ my $dbpassword = 'sankar123';
 my $send_email = 1;
 my $pop_required = 0;
 my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2005-06 Quarter 4 (February - April 2006) Electives Submission";
+my $title = "PGSEM 2006-07 Quarter 1 (June - August 2006) Phase 1 Electives Submission";
 # === end configurable information
 
 my %states = (
@@ -38,6 +38,8 @@ my %states = (
               'Login' => \&print_electives_page,
               'Submit Preferences' => \&print_ack_page
              );
+
+my $phase = 1;
 
 # === below to be moved to a library module ===
 
@@ -59,6 +61,18 @@ sub skip_line($)
     return 0;
   }
 
+sub year_from_rollno($)
+{
+    my $rollno = shift;
+
+    my $year = substr($rollno, 0, 4);
+    $year =~ s/2021/2000/;
+    $year =~ s/2104/2001/;
+    $year =~ s/2204/2002/;
+
+    return $year;
+}
+
 sub load_students($)
   {
     my $errors = 0;
@@ -67,10 +81,11 @@ sub load_students($)
     while (<IN>) {
       chomp;
       next if skip_line($_);
-      my ($rollno, $name, $email, $cgpa) = 
+      my ($rollno, $name, $email, $cgpa, $credits, $site) = 
         split(/\s*\;\s*/, $_) unless skip_line($_); 
 
       $cgpa = undef if (defined($cgpa) && ($cgpa eq ''));
+      $site = undef if (defined($site) && ($site eq ''));
 
       if (!defined($rollno) || ($rollno eq "")) {
         err_print("error:$file:$.: no roll number");
@@ -90,12 +105,19 @@ sub load_students($)
         next;
       }
 
+      if (!defined($site) || ($site eq "")) {
+        err_print("error:$file:$.: site undefined for $rollno");
+        ++$errors;
+        next;
+      }
+
       $name ||= "";
       $email ||= "";
 
       $students{$rollno}{"name"} = $name;
       $students{$rollno}{"email"} = $email;
       $students{$rollno}{"cgpa"} = $cgpa;
+      $students{$rollno}{"site"} = $site;
 
     }
     close IN;
@@ -111,7 +133,9 @@ sub print_students ()
                  $rollno,
                  $students{$rollno}{"name"},
                  $students{$rollno}{"email"},
-                 $students{$rollno}{"cgpa"} || ""), "\n";
+                 $students{$rollno}{"cgpa"},
+                 $students{$rollno}{"credits"},
+                 $students{$rollno}{"site"} || ""), "\n";
     }
     print "\n";
   }
@@ -123,11 +147,12 @@ sub load_courses($)
     while (<IN>) {
       chomp;
       next if skip_line($_);
-      my ($code, $name, $instructor, $cap, $slot) = 
+      my ($code, $name, $instructor, $cap, $slot, $dummy, $sites, $rbatches) = 
         split(/\s*\;\s*/, $_) unless skip_line($_); 
 
       $cap = undef if (defined($cap) && ($cap eq ''));
       $slot = undef if (defined($slot) && ($slot eq ''));
+      $sites =~ s/\+/\,/g;
 
       if (!defined($code) || ($code eq "")) {
         err_print("error:$file:$.: no course code");
@@ -151,6 +176,8 @@ sub load_courses($)
       $courses{$code}{"instructor"} = $instructor;
       $courses{$code}{"cap"} = $cap;
       $courses{$code}{"slot"} = $slot;
+      $courses{$code}{"sites"} = $sites;
+      $courses{$code}{"rbatches"} = $rbatches;
 
     }
     close IN;
@@ -165,12 +192,14 @@ sub print_courses ()
                  $courses{$code}{"name"},
                  $courses{$code}{"instructor"},
                  $courses{$code}{"cap"},
+                 $courses{$code}{"sites"},
+                 $courses{$code}{"rbatch"},
                  $courses{$code}{"slot"} || ""), "\n";
     }
     print "\n";
   }
 
-# === above to be moved to a library modele === 
+# === above to be moved to a library module === 
 
 sub to_page ($)
   {
@@ -197,25 +226,37 @@ sub print_login_page()
     print header(), start_html($title), h3($title);
 
     print <<'EOF';
+
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
-students for applying for elective courses for the quarter starting
-Feb. 2006.<br>Submission deadline is 24:00 IST, Monday, 6 February, 2006.<br>
+students for applying for elective courses (<b>Phase 1</b>) for the quarter starting
+June 2006.<br>Submission deadline is 24:00 IST, Tuesday, 2 May, 2006.<br><br>
+
 <font color='red'>Submissions after the deadline will only be considered 
-subject to the PGSEM Chairperson's approval.</font></div>
+subject to the PGSEM Chairperson's approval.<br><br>
+
+As per PGSEM rules, you will be allowed to participate in Phase 2 
+<i>only if</i> you submit your Phase 1 preferences.</font></div>
+
 <div style="">The process of applying for the electives
 can be accomplished in three easy steps. These are as
 follows:<ol><li>Get a passcode: Use the form below, enter your roll
 number and press the "Get Passcode" button. A passcode will be e-mailed
 to you at your IIMB email id. This is necessary so as to ensure that no
-one else can enter elective choices on your behalf.</li> <li>Login: You
-can now login by entering <b>both</b> your roll number <b>and</b> this passcode and
-pressing the "Login" button. You will be sent to the elective choice
-page.</li><li>Choose: In the elective choice page, give your choices as
+one else can enter elective choices on your behalf. 
+<font color='blue'>A passcode once obtained can be used any number of times 
+spanning Phase 1, 2, and 3 for Quarter 1 electives submission. 
+<i>Note: Students who have submitted choices earlier for Q4 using this site,
+need to obtain a new passcode.</i></font></li><br>
+<li>Login: You can now login by entering <b>both</b> your roll number <b>and</b> 
+this passcode and pressing the "Login" button. You will be sent to the elective choice
+page.</li><br><li>Choose: In the elective choice page, give your choices as
 per the priority (first course is highest priority) and submit the
 choices you want to take. This will acknowledge the choices you selected
 by listing them and will also send you a mail about the courses you
-chose.</li></ol> </div>
+chose. <font color='blue><i>Note: Please submit as many preferences as you wish
+(not just 3) since we want to estimate the Phase 2 demand realistically
+and come up with an optimal schedule.</i></li><br></ol> </div>
 EOF
 
     print
@@ -394,10 +435,16 @@ sub print_authentication_page()
       return;
     }
 
+    my $site = $students{$rollno}{'site'};
+    my $displayed_site;
+    $displayed_site = 'Bangalore' if ($site eq 'B');
+    $displayed_site = 'Chennai' if ($site eq 'C');
+
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
     print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
     print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "<tr><td>Site:</td><td>$displayed_site</td></tr>";
     print "</table>\n";
     print br;
 
@@ -568,10 +615,26 @@ sub print_electives_page ()
    
     my $errors = load_students("$config_dir/students.txt");
 
+    my $site = $students{$rollno}{'site'};
+
+    my %courses_for_student;
+
+    foreach my $course (keys %courses) {
+      my $course_sites = $courses{$course}{"sites"};
+      if (index($course_sites, $site) >= 0) {
+        $courses_for_student{$course} = 1;
+      }
+    }
+      
+    my $displayed_site;
+    $displayed_site = 'Bangalore' if ($site eq 'B');
+    $displayed_site = 'Chennai' if ($site eq 'C');
+
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
     print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
     print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "<tr><td>Site:</td><td>$displayed_site</td></tr>";
     print "</table>\n";
    
     load_courses("$config_dir/courses.txt");
@@ -587,11 +650,14 @@ sub print_electives_page ()
     print "<font size=\"-1\"><table border='1'>\n";
     
     print "<tr>\n";
-    print "<td><b>Slot</b></td>\n";
+    print "<td><b>Slot</b></td>\n" unless ($phase eq '1');
     print "<td><b>Code</b></td>\n";
     print "<td><b>Name</b></td>\n";
     print "<td><b>Instructor</b></td>\n";
     print "<td><b>Cap</b></td>\n";
+    print "<td><b>Sites</b></td>\n";
+    print "<td><b>Batches <i>not</i> Allowed<b></td>";
+    print "<td><b>Available to You</b></td>\n";
     print "</tr>\n";
    
     my @courselist = "--------";
@@ -602,18 +668,50 @@ sub print_electives_page ()
         return $val || ($a cmp $b) } 
     
       keys %courses) {
+
+      my $sites = $courses{$course}{"sites"};
+      my $sites_displayed = '';
+      if ($sites eq 'B') {
+        $sites_displayed = 'Bangalore';
+      } elsif ($sites eq 'C') {
+        $sites_displayed = 'Chennai';
+      } elsif ($sites eq 'B,C') {
+        $sites_displayed = "Potentially distributed";
+      }
+
+      my $student_can_take_course = 0;
+      my $bgcolor = 'white';
+
+      if (index($sites, $site) >= 0) {
+        # B =~ B, B =~ B,C, C =~ C, C =~ B,C
+        $student_can_take_course = 1;
+      }
      
-      print "<tr>\n";
+      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+          $student_can_take_course = 0;
+      }
+
+      $bgcolor = '#D0D0D0' unless $student_can_take_course;
+
+      print "<tr bgcolor='$bgcolor'>\n";
     
-      print "<td>$courses{$course}{'slot'}</td>";
+      print "<td>$courses{$course}{'slot'}</td>" unless ($phase eq '1');
       print "<td>$course</td>";
       print "<td>$courses{$course}{'name'}</td>";
       print "<td>$courses{$course}{'instructor'}</td>";
       print "<td>", $courses{$course}{'cap'}||"No cap", "</td>";
+      print "<td>", $sites_displayed, "</td>";
+      print "<td>", $courses{$course}{'rbatches'}, "</td>";
+      print "<td>", $student_can_take_course ? "Yes" : "No", "</td>";
    
-      my $menuitem = "$course:Slot $courses{$course}{'slot'}:$courses{$course}{'name'}";
-      push @courselist, $menuitem; 
-      $coursecode_to_menuitem{$course} = $menuitem;
+      my $menuitem = "$course:" . 
+        (($phase eq 1) ? ":" : "Slot $courses{$course}{'slot'}:") . 
+        "$courses{$course}{'name'}:" . "$sites_displayed";
+
+      if ($student_can_take_course) {
+        push @courselist, $menuitem; 
+        $coursecode_to_menuitem{$course} = $menuitem;
+      }
 
       print "</tr>\n";
     }
@@ -621,12 +719,17 @@ sub print_electives_page ()
     print "</table></font>\n";
     print br;
 
-    print <<'EOF';
+
+    if ($phase != 1) {
+
+      print <<'EOF';
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">The slots indicate the day and the time in
 which the course will happen. Thus F1 is first slot on Friday or S4 is
 fourth slot on Saturday</div>
 EOF
+
+   }
 
    my %rec;
    my $rec = \%rec;
@@ -714,7 +817,7 @@ sub update_db_with_preferences ($$$)
 
       my @codes = split(',', $courselist);
       for (my $i = 0; $i < @codes; ++$i) { 
-        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]');");
+        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1');");
         die "INSERT failed" unless $status;
       }
       # $dbh->commit();
@@ -767,10 +870,16 @@ sub print_ack_page ()
       return;
     }
 
+    my $site = $students{$rollno}{'site'};
+    my $displayed_site;
+    $displayed_site = 'Bangalore' if ($site eq 'B');
+    $displayed_site = 'Chennai' if ($site eq 'C');
+
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
     print "<tr><td>Name:</td><td>$students{$rollno}{'name'}</td></tr>";
     print "<tr><td>E-Mail:</td><td>$students{$rollno}{'email'}</td></tr>";
+    print "<tr><td>Site:</td><td>$displayed_site</td></tr>";
     print "</table>\n";
     print br;
 
@@ -787,7 +896,16 @@ sub print_ack_page ()
     my %choices;
     my $sepfound = 0;
 
-    for (my $i = 0; $i < scalar(keys %courses); ++$i) {
+    my %courses_for_student;
+
+    foreach my $course (keys %courses) {
+      my $course_sites = $courses{$course}{"sites"};
+      if (index($course_sites, $students{$rollno}{'site'}) >= 0) {
+        $courses_for_student{$course} = 1;
+      }
+    }
+      
+    for (my $i = 0; $i < scalar(keys %courses_for_student); ++$i) {
 
       my $pref = $i + 1;
       my $code = param("pref$pref");
@@ -840,10 +958,13 @@ sub print_ack_page ()
     return if ($rv != 0);
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
-    my $subject = "Course preferences";
+    my $subject = "Phase 1 course preferences";
 
     my $body = "\n";
-    $body .= "Roll Number: $rollno\n\n";
+    $body .= "Phase 1 course preferences\n\n";
+    $body .= "Roll Number: $rollno\n";
+    $body .= "Name: $students{$rollno}{'name'}\n";
+    $body .= "Site: $displayed_site\n\n";
     $body .= "Number of courses: $rec->{'ncourses'}\n\n";
     $body .= "Course preferences:\n";
     my $index = 1;
@@ -878,10 +999,10 @@ sub print_ack_page ()
 
 sub main()
 {
-    # February 8, 2006, 00:00 hrs IST
+    # May 4, 2006, 00:00 hrs IST (that's May 3/4 night)
     # mktime(second, minute, hour, day, month-1, year-1900)
 
-    my $deadline = POSIX::mktime(0, 00, 00, 8, 1, 106);
+    my $deadline = POSIX::mktime(0, 00, 00, 4, 4, 106);
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
