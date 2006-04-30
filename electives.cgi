@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.12 2006/04/30 13:24:31 a14562 Exp $
+# $Id: electives.cgi,v 1.13 2006/04/30 16:33:02 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -621,8 +621,15 @@ sub print_electives_page ()
 
     foreach my $course (keys %courses) {
       my $course_sites = $courses{$course}{"sites"};
+      my $student_can_take_course = 0;
       if (index($course_sites, $site) >= 0) {
-        $courses_for_student{$course} = 1;
+          $student_can_take_course = 1;
+      }
+      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+          $student_can_take_course = 0;
+      }
+      if ($student_can_take_course) {
+          $courses_for_student{$course} = 1;
       }
     }
       
@@ -900,8 +907,15 @@ sub print_ack_page ()
 
     foreach my $course (keys %courses) {
       my $course_sites = $courses{$course}{"sites"};
-      if (index($course_sites, $students{$rollno}{'site'}) >= 0) {
-        $courses_for_student{$course} = 1;
+      my $student_can_take_course = 0;
+      if (index($course_sites, $site) >= 0) {
+          $student_can_take_course = 1;
+      }
+      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+          $student_can_take_course = 0;
+      }
+      if ($student_can_take_course) {
+          $courses_for_student{$course} = 1;
       }
     }
       
