@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.13 2006/04/30 16:33:02 a14562 Exp $
+# $Id: electives.cgi,v 1.14 2006/05/03 12:46:01 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -236,7 +236,13 @@ June 2006.<br>Submission deadline is 24:00 IST, Tuesday, 2 May, 2006.<br><br>
 subject to the PGSEM Chairperson's approval.<br><br>
 
 As per PGSEM rules, you will be allowed to participate in Phase 2 
-<i>only if</i> you submit your Phase 1 preferences.</font></div>
+<i>only if</i> you submit your Phase 1 preferences.</font><br><br>
+
+The official rules and processes are provided in the 
+<a href="http://moodle.iimb.ernet.in/course/view.php?id=11">IIMB moodle site</a>.
+These rules and processes are explained with examples 
+<a href="http://sankara.net/electives-allocation.html">here</a>.
+</div>
 
 <div style="">The process of applying for the electives
 can be accomplished in three easy steps. These are as

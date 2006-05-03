@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summary.cgi,v 1.2 2006/02/06 21:17:23 a14562 Exp $
+# $Id: summary.cgi,v 1.3 2006/05/03 12:46:01 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -200,7 +200,7 @@ sub main()
     my %counts;
 
     foreach my $course (sort keys %courses) {
-      for (my $priority = 1; $priority < (keys %courses); ++$priority) {
+      for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
 
         my $status;
         my $sth;
@@ -229,7 +229,7 @@ sub main()
     
     print "<table border='1'>\n";
     print "<tr><td>Code</td><td>Name</td><td>Total</td>\n";
-    for (my $priority = 1; $priority < (keys %courses); ++$priority) {
+    for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
       print "<td>$priority</td>\n";
     }
     print "</tr>\n";
@@ -240,7 +240,7 @@ sub main()
       print "<td>", $courses{$course}{"name"}, "</td>\n";
       print "<td align='right'>", $counts{$course}{"total"}, "</td>\n";
       
-      for (my $priority = 1; $priority < (keys %courses); ++$priority) {
+      for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
         print "<td align='right' width='20'>", 
           $counts{$course}{"priority"}->{$priority} || 0, "</td>\n";
       }
