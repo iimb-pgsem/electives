@@ -1,0 +1,49 @@
+
+Dear PGSEM student:
+
+The electives submission site for Q1 2006-07 is ready.
+Please submit your Phase 1 choices via
+
+http://sankara.net/cgi-bin/electives.cgi
+
+Submission deadline is 24:00 IST, Tuesday, 2 May, 2006.
+
+Submissions after the deadline will only be considered 
+subject to the PGSEM Chairperson's approval.
+
+As per PGSEM rules, you will be allowed to participate in Phase 2 
+only if you submit your Phase 1 preferences.
+
+Instructions for Phase 1 submissions are given below
+(these are also available at the web site):
+
+The process of applying for the electives can be accomplished in three easy steps. 
+These are as follows:
+
+   1. Get a passcode: Use the form available at the website, 
+      enter your roll number and press the "Get Passcode" button. 
+      A passcode will be e-mailed to you at your IIMB email id. 
+      This is necessary so as to ensure that no one else can enter elective choices 
+      on your behalf. A passcode once obtained can be used any number of times 
+      spanning Phase 1, 2, and 3 for Quarter 1 electives submission. 
+      Note: Students who have submitted choices earlier for Q4 using this site, 
+      need to obtain a new passcode.
+
+   2. Login: You can now login by entering both your roll number and this passcode 
+      and pressing the "Login" button. You will be sent to the elective choice page.
+
+   3. Choose: In the elective choice page, give your choices as per the priority 
+      (first course is highest priority) and submit the choices you want to take. 
+      This will acknowledge the choices you selected by listing them and 
+      will also send you a mail about the courses you chose.
+      Note: Please submit as many preferences as you wish (not just 3) 
+      since we want to estimate the Phase 2 demand realistically and 
+      come up with an optimal schedule.
+
+If you have a specific question (e.g., you cannnot submit your preferences, etc.), 
+please mail us at pgsemelectives@sankara.net.
+
+If you have a general question please post to the moodle forum.
+
+Regrards
+Abhay / Sankar
