@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.14 2006/05/03 12:46:01 a14562 Exp $
+# $Id: electives.cgi,v 1.15 2006/05/11 08:10:06 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -755,10 +755,10 @@ EOF
    }
 
    print
-        "Number of courses: ", 
+        br, "Number of courses: ", "<blink>*</blink>", 
           popup_menu(-name=>'ncourses', 
                      -values=>['-', '1', '2', '3', '4'],
-                     -default=>($rv == 0 ? $rec->{"ncourses"} : '-')), br;
+                     -default=>($rv == 0 ? $rec->{"ncourses"} : '-')), br, br;
    
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
@@ -1019,10 +1019,10 @@ sub print_ack_page ()
 
 sub main()
 {
-    # May 4, 2006, 00:00 hrs IST (that's May 3/4 night)
+    # May 3, 2006, 00:00 hrs IST (that's May 3/4 night)
     # mktime(second, minute, hour, day, month-1, year-1900)
 
-    my $deadline = POSIX::mktime(0, 00, 00, 4, 4, 106);
+    my $deadline = POSIX::mktime(0, 00, 00, 3, 4, 106);
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
