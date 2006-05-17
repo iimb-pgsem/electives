@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.11 2006/02/12 11:48:43 a14562 Exp $
+# $Id: elec.pl,v 1.12 2006/05/17 15:29:32 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -71,9 +71,9 @@ my $min_credits = 0;
 
 my $credits_pass = 93; 
 # >=93 credits already taken => no seniority preference
-my $senior_year = 2003;
+my $senior_year = 2004;
 # latest joining year upto which seniority preference is given
-my $current_year = 2004;
+my $current_year = 2005;
 
 my $max_courses = 4;
 my $give_priority_to_seniors = 1;
@@ -94,7 +94,7 @@ my %students;
 # students hash:
 # key is rollno
 # value is a hash keyed by attributes:
-# name, email, cgpa (all loaded at the beginning) 
+# name, email, cgpa, credits, seniority, site (all loaded at the beginning) 
 # and slot which is a hash keyed by integers 1..$max_slots
 # where the value can be undef or 1
 # 
@@ -267,7 +267,7 @@ sub load_students($)
     while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($rollno, $name, $email, $cgpa, $credits) = 
+        my ($rollno, $name, $email, $cgpa, $credits, $site) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $cgpa = $default_cgpa if (defined($cgpa) && ($cgpa eq ''));
@@ -299,12 +299,14 @@ sub load_students($)
 
         $name ||= "";
         $email ||= "";
+	$site ||= "B";
 
         $students{$rollno}{"name"} = $name;
         $students{$rollno}{"email"} = $email;
         $students{$rollno}{"cgpa"} = $cgpa;
         $students{$rollno}{"credits"} = $credits;
         $students{$rollno}{"seniority"} = seniority_from_rollno($rollno);
+        $students{$rollno}{"site"} = $site;
 
     }
     close IN;
@@ -677,6 +679,79 @@ sub get_format
   }
 }
 
+sub all_students
+{
+  return 1;
+}
+
+sub chennai_students
+{
+  my $roll = shift;
+  if ($students{$roll}{"site"} eq "C") {
+
+    return 1;
+  }
+  return 0;
+}
+
+sub only_2005_students
+{
+  my $roll = shift;
+  if ($students{$roll}{"seniority"} == $current_year) {
+
+    return 1;
+  }
+  return 0;
+}
+
+sub only_senior_students
+{
+  my $roll = shift;
+  if ($students{$roll}{"seniority"} != $current_year) {
+
+    return 1;
+  }
+  return 0;
+}
+
+sub write_conflicts
+{
+  my $fptr = shift;
+  my $conflictint = shift;
+  my $title = shift;
+  my $rowoffset = shift;
+  my $formatint = shift;
+
+  $rowoffset *= (scalar(keys %courses) + 4);
+  $conflictint->write($rowoffset, 0, $title, $formatint);
+  ++$rowoffset;
+
+    my $count = 0;
+    my %courseNum;
+    my @conflictsall;
+    compute_conflicts(\@conflictsall, $fptr);
+
+    foreach my $i (sort keys %courses) {
+
+      print "Course $i is $count\n";
+      $courseNum{$i} = $count;
+      $conflictint->write($rowoffset, $count + 1, $i);
+      $conflictint->write($rowoffset + $count + 1, 0, $i);
+      ++$count;
+    }
+  
+    foreach my $rec (@conflictsall) {
+
+      print "Conflict: $rec->{'a'} ($courseNum{$rec->{'a'}}) - $rec->{'b'} ($courseNum{$rec->{'b'}}): $rec->{'n'}\n";
+      if ($courseNum{$rec->{'a'}} >= $courseNum{$rec->{'b'}}) {
+
+        $conflictint->write($rowoffset + $courseNum{$rec->{'a'}} + 1,
+		    $courseNum{$rec->{'b'}} + 1,
+			$rec->{'n'});
+      }
+    }
+}
+
 sub write_excel
 {
     # Generate two workbooks, internal and external.
@@ -758,6 +833,19 @@ sub write_excel
     $summaryext->write(0, 1, "Name", $formatext);
     $summaryext->set_column(1, 1, $name_width);
     $summaryext->write(0, 2, "#Courses", $formatext);
+
+
+    my $conflictint = $workbookint->add_worksheet("Conflicts");
+    $conflictint->set_paper(9);
+    $conflictint->set_landscape();
+    $conflictint->fit_to_pages(1);
+    $conflictint->set_header("&C$title: &A");
+    $conflictint->set_footer("&C$footer&R&P of &N");
+
+    write_conflicts(\&all_students, $conflictint, "All students", 0, $formatint);
+    write_conflicts(\&chennai_students, $conflictint, "Chennai students", 1, $formatint);
+    write_conflicts(\&only_2005_students, $conflictint, "Only 2005 batch students", 2, $formatint);
+    write_conflicts(\&only_senior_students, $conflictint, "Only senior batch students", 3, $formatint);
 
     foreach my $course (sort keys %courses) {
 
@@ -998,31 +1086,36 @@ sub get_students_for_course($$)
   return %rollnoset;
 }
 
-my @conflicts;
 
 sub compute_conflicts
 {
+  my $conflicts = shift;
+  my $studentselect = shift;
     foreach my $i (keys %courses) {
         foreach my $j (keys %courses) {
-            next if $i eq $j;
+            # next if $i eq $j;
 
             my %iset = get_students_for_course($i, 3); 
-            my %jset = get_students_for_course($i, 3); 
+            my %jset = get_students_for_course($j, 3); 
             my %isect = ();
 
             foreach my $roll (keys %iset) {
-                $isect{$roll} = 1 if (defined($jset{$roll}));
+
+                if (&$studentselect($roll)) {
+
+                      $isect{$roll} = 1 if (defined($jset{$roll}));
+                }
             }
 
-            push @conflicts, 
+            push @$conflicts, 
                 {"a" => $i, "b" => $j, "n" => scalar(keys %isect)};
         }
     }
 
-    @conflicts = sort { $a->{"n"} <=> $b->{"n"} } @conflicts;
+    @$conflicts = sort { $a->{"n"} <=> $b->{"n"} } @$conflicts;
 
     print "=== Course conflicts ===\n";
-    foreach my $rec (@conflicts) {
+    foreach my $rec (@$conflicts) {
         print "$rec->{'a'} - $rec->{'b'}: $rec->{'n'}\n";
     } 
 }
@@ -1044,7 +1137,6 @@ sub main
     print_allocation_by_course;
     print_allocation_by_student;
 
-    compute_conflicts;
 
     @ranklist = sort { by_student_rank } (keys %students);
     print join("\n", @ranklist);
