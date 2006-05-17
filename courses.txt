@@ -1,19 +1,23 @@
-MITSTP;Managing Innovation: Technology Strategy in Theory and Practice;Rajeev S;B:50, C:10;S1;;B+C; 
+MITSTP;Managing Innovation: Technology Strategy in Theory and Practice;Rajeev S;50;S1;;B; 
+MITSTP;Managing Innovation: Technology Strategy in Theory and Practice;Rajeev S;10;S1;;C; 
 FSAB;Financial Statement Analysis - BLR;N R Parasuraman;70;S4;;B; 
 FSAC;Financial Statement Analysis - Chennai;G Balasubramanian;;S4;;C; 
 NEF;New Enterprise Financing;G Sabarinathan;;S2;;B;2005
 INVB;Investments - BLR;MS Narasimhan;65;S2;;B; 
 INVC;Investments - Chennai;G Ramachandran;;S2;;C; 
 OPT;Options;Ramon Rabinovitch ;70;S1;;B; 
-BTBMM;Business to Business Market Management;DVR Seshadri;B:50, C:20;S3;;B+C; 
+BTBMM;Business to Business Market Management;DVR Seshadri;50;S3;;B; 
+BTBMM;Business to Business Market Management;DVR Seshadri;20;S3;;C; 
 PIE;Personal and Interpersonal Effectiveness;C Manohar Reddy;20;S4;;B; 
 CRHD;Corporate Restructuring & Human Dimensions (+PGP);V Anand Ram;14;S3;;B; 
 SCMB;Supply Chain Management - BLR;Jay Jayaram;65;S1;;B; 
 SCMC;Supply Chain Management - Chennai;Balasubramanian;;S1;;C; 
-OS;Operations Strategy (+PGP);LS Murthy;B:11, C:15;S2;;B+C; 
+OS;Operations Strategy (+PGP);LS Murthy;11;S2;;B; 
+OS;Operations Strategy (+PGP);LS Murthy;15;S2;;C; 
 TI;Telecom Industry;G Venkatesh;40;S4;;B; 
 SPM;Software Project Management;Shankar Venkatagiri;60;S1;;B; 
 NVC;New Venture Creation;Smita Ramakrishna;40;S2;;B; 
 KM;Knowledge Management;T Srikantaiah;70;S3;;B; 
-SSIPM;Six Sigma Integrated Program Management;Madhava Vemuri;B:50, C:15;S4;;B+C; 
-JL;Japanese Language ;Faculty from NAVIS;70;S3;;B; 
+SSIPM;Six Sigma Integrated Program Management;Madhava Vemuri;50;S4;;B; 
+SSIPM;Six Sigma Integrated Program Management;Madhava Vemuri;15;S4;;C; 
+JL;Japanese Language ;Faculty from NAVIS;;S3;;B; 
