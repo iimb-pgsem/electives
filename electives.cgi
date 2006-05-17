@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.15 2006/05/11 08:10:06 a14562 Exp $
+# $Id: electives.cgi,v 1.16 2006/05/17 15:32:39 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -29,7 +29,12 @@ my $dbpassword = 'sankar123';
 my $send_email = 1;
 my $pop_required = 0;
 my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2006-07 Quarter 1 (June - August 2006) Phase 1 Electives Submission";
+my $title = "PGSEM 2006-07 Quarter 1 (June - August 2006) Phase 2 Electives Submission";
+my $phase = 2;
+my $quarter_starts = "June 2006"; # text field for printing
+my @submission_deadlines = 
+  ( "24:00 IST, Tuesday, 2 May, 2006.",
+    "24:00 IST, Monday, 15 May, 2006.");
 # === end configurable information
 
 my %states = (
@@ -39,7 +44,6 @@ my %states = (
               'Submit Preferences' => \&print_ack_page
              );
 
-my $phase = 1;
 
 # === below to be moved to a library module ===
 
@@ -164,11 +168,6 @@ sub load_courses($)
         next;
       }
 
-      if (defined($cap) && (($cap < 1))) {
-        err_print("error:$file:$.: invalid cap '$cap'");
-        next;
-      }
-
       $name ||= "";
       $instructor ||= "";
 
@@ -229,14 +228,44 @@ sub print_login_page()
 
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
-students for applying for elective courses (<b>Phase 1</b>) for the quarter starting
-June 2006.<br>Submission deadline is 24:00 IST, Tuesday, 2 May, 2006.<br><br>
+students for applying for elective courses (<b>Phase
+EOF
+
+    print " $phase";
+    print <<'EOF';
+</b>) for the quarter starting
+EOF
+
+    print " $quarter_starts";
+    print <<'EOF';
+<br>Submission deadline is
+EOF
+
+    print " $submission_deadlines[$phase -1]";
+    print <<'EOF';
+<br><br>
 
 <font color='red'>Submissions after the deadline will only be considered 
 subject to the PGSEM Chairperson's approval.<br><br>
 
+EOF
+
+    if ($phase == 1) {
+
+        print <<'EOF';
 As per PGSEM rules, you will be allowed to participate in Phase 2 
 <i>only if</i> you submit your Phase 1 preferences.</font><br><br>
+EOF
+    }
+    else {
+        print <<'EOF';
+As per PGSEM rules, if you have not participated in phase 1, your
+choices for phase 2 will be considered after considering the choices
+of all other students.</font><br><br>
+EOF
+    }
+
+    print <<'EOF';
 
 The official rules and processes are provided in the 
 <a href="http://moodle.iimb.ernet.in/course/view.php?id=11">IIMB moodle site</a>.
@@ -250,19 +279,42 @@ follows:<ol><li>Get a passcode: Use the form below, enter your roll
 number and press the "Get Passcode" button. A passcode will be e-mailed
 to you at your IIMB email id. This is necessary so as to ensure that no
 one else can enter elective choices on your behalf. 
-<font color='blue'>A passcode once obtained can be used any number of times 
-spanning Phase 1, 2, and 3 for Quarter 1 electives submission. 
-<i>Note: Students who have submitted choices earlier for Q4 using this site,
-need to obtain a new passcode.</i></font></li><br>
-<li>Login: You can now login by entering <b>both</b> your roll number <b>and</b> 
-this passcode and pressing the "Login" button. You will be sent to the elective choice
-page.</li><br><li>Choose: In the elective choice page, give your choices as
+EOF
+
+    if ($phase == 2) {
+
+        print <<'EOF';
+ If you have already obtained a passcode in phase 1, you can continue
+to use the same without having to generate one again.  If you have
+forgotten that passcode, please feel free to re-generate it.
+EOF
+    }
+
+    print <<'EOF';
+ <font color='blue'>A passcode once obtained can be used any number of
+times spanning Phase 1, 2, and 3 for Quarter 1 electives submission.
+<i>Note: Students who have submitted choices earlier for Q4 using this
+site, need to obtain a new passcode.</i></font></li><br> <li>Login:
+You can now login by entering <b>both</b> your roll number <b>and</b>
+this passcode and pressing the "Login" button. You will be sent to the
+elective choice page.</li><br><li>Choose: In the elective choice page,
+select the number of courses you wish to do, then give your choices as
 per the priority (first course is highest priority) and submit the
-choices you want to take. This will acknowledge the choices you selected
-by listing them and will also send you a mail about the courses you
-chose. <font color='blue><i>Note: Please submit as many preferences as you wish
-(not just 3) since we want to estimate the Phase 2 demand realistically
-and come up with an optimal schedule.</i></li><br></ol> </div>
+choices you want to take. This will acknowledge the choices you
+selected by listing them and will also send you a mail about the
+courses you chose. 
+
+    if ($phase == 1) {
+
+        print <<'EOF';
+ <font color='blue><i>Note: Please submit as many
+preferences as you wish (not just 3) since we want to estimate the
+Phase 2 demand realistically and come up with an optimal
+schedule.</i>
+    }
+
+    print <<'EOF';
+ </li><br></ol> </div>
 EOF
 
     print
@@ -689,7 +741,7 @@ sub print_electives_page ()
       } elsif ($sites eq 'C') {
         $sites_displayed = 'Chennai';
       } elsif ($sites eq 'B,C') {
-        $sites_displayed = "Potentially distributed";
+        $sites_displayed = "Distributed";
       }
 
       my $student_can_take_course = 0;
@@ -733,16 +785,6 @@ sub print_electives_page ()
     print br;
 
 
-    if ($phase != 1) {
-
-      print <<'EOF';
-<div style="background-color:#ffd; border:black solid
-2px;margin:1em;padding:5px">The slots indicate the day and the time in
-which the course will happen. Thus F1 is first slot on Friday or S4 is
-fourth slot on Saturday</div>
-EOF
-
-   }
 
    my %rec;
    my $rec = \%rec;
@@ -978,10 +1020,10 @@ sub print_ack_page ()
     return if ($rv != 0);
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
-    my $subject = "Phase 1 course preferences";
+    my $subject = "Phase 2 course preferences";
 
     my $body = "\n";
-    $body .= "Phase 1 course preferences\n\n";
+    $body .= "Phase 2 course preferences\n\n";
     $body .= "Roll Number: $rollno\n";
     $body .= "Name: $students{$rollno}{'name'}\n";
     $body .= "Site: $displayed_site\n\n";
@@ -1022,7 +1064,7 @@ sub main()
     # May 3, 2006, 00:00 hrs IST (that's May 3/4 night)
     # mktime(second, minute, hour, day, month-1, year-1900)
 
-    my $deadline = POSIX::mktime(0, 00, 00, 3, 4, 106);
+    my $deadline = POSIX::mktime(0, 00, 00, 15, 4, 106);
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
