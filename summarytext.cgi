@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summarytext.cgi,v 1.3 2006/02/07 12:58:04 a14562 Exp $
+# $Id: summarytext.cgi,v 1.4 2006/05/17 15:30:18 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -125,11 +125,6 @@ sub load_courses($)
 
       if (defined($courses{$code})) {
         err_print("error:$file:$.: course '$code' already defined");
-        next;
-      }
-
-      if (defined($cap) && (($cap < 1))) {
-        err_print("error:$file:$.: invalid cap '$cap'");
         next;
       }
 
