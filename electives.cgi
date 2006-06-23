@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.16 2006/05/17 15:32:39 a14562 Exp $
+# $Id: electives.cgi,v 1.17 2006/06/23 13:31:52 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -29,7 +29,7 @@ my $dbpassword = 'sankar123';
 my $send_email = 1;
 my $pop_required = 0;
 my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2006-07 Quarter 1 (June - August 2006) Phase 2 Electives Submission";
+my $title = "PGSEM 2006-07 Quarter 1 (June - August 2006) Phase 3 Electives Submission";
 my $phase = 2;
 my $quarter_starts = "June 2006"; # text field for printing
 my @submission_deadlines = 
@@ -303,6 +303,7 @@ per the priority (first course is highest priority) and submit the
 choices you want to take. This will acknowledge the choices you
 selected by listing them and will also send you a mail about the
 courses you chose. 
+EOF
 
     if ($phase == 1) {
 
@@ -311,6 +312,7 @@ courses you chose.
 preferences as you wish (not just 3) since we want to estimate the
 Phase 2 demand realistically and come up with an optimal
 schedule.</i>
+EOF
     }
 
     print <<'EOF';
@@ -1064,12 +1066,12 @@ sub main()
     # May 3, 2006, 00:00 hrs IST (that's May 3/4 night)
     # mktime(second, minute, hour, day, month-1, year-1900)
 
-    my $deadline = POSIX::mktime(0, 00, 00, 15, 4, 106);
+    my $deadline = POSIX::mktime(0, 00, 00, 16, 4, 106);
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
-      print "Electives submission deadline is over. ";
-      print "Please contact PGSEM office for further assistance. ";
+      print "Please await instructions via e-mail for Phase 3.", br;
+      print "Phase 3 will be enabled by 12:00 noon Saturday June 24, 2006.",  br;
       print local_end_html();
       return;
     }
