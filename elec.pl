@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.13 2006/05/17 16:06:07 a14562 Exp $
+# $Id: elec.pl,v 1.14 2006/06/23 13:26:47 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -759,7 +759,7 @@ sub chennai_students
 sub only_2005_students
 {
   my $roll = shift;
-  if ($students{$roll}{"seniority"} == $current_year) {
+  if ($students{$roll}{"seniority"} == 2005) { # TODO fix hard coding
 
     return 1;
   }
@@ -769,7 +769,7 @@ sub only_2005_students
 sub only_senior_students
 {
   my $roll = shift;
-  if ($students{$roll}{"seniority"} != $current_year) {
+  if ($students{$roll}{"seniority"} != 2005) { # TODO fix hard coding
 
     return 1;
   }
@@ -805,7 +805,7 @@ sub write_conflicts
     foreach my $rec (@conflictsall) {
 
       print "Conflict: $rec->{'a'} ($courseNum{$rec->{'a'}}) - $rec->{'b'} ($courseNum{$rec->{'b'}}): $rec->{'n'}\n";
-      if ($courseNum{$rec->{'a'}} > $courseNum{$rec->{'b'}}) {
+      if ($courseNum{$rec->{'a'}} >= $courseNum{$rec->{'b'}}) {
 
 	$conflictint->write($rowoffset + $courseNum{$rec->{'a'}} + 1,
 			    $courseNum{$rec->{'b'}} + 1,
@@ -1200,7 +1200,7 @@ sub compute_conflicts
   my $studentselect = shift;
     foreach my $i (keys %courses) {
         foreach my $j (keys %courses) {
-            next if $i eq $j;
+            # next if $i eq $j;
 
             my %iset = get_students_for_course($i, 3); 
             my %jset = get_students_for_course($j, 3); 
