@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: electives.cgi,v 1.18 2006/06/24 19:35:37 a14562 Exp $
+# $Id: electives.cgi,v 1.19 2006/06/24 19:37:47 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -437,7 +437,7 @@ EOF
         to_page('Get Passcode'), "</td></tr>",
 
         "<tr><td>Passcode:</td>",
-        "<td>", textfield(-name=>'authcode',  -size=>20, -maxlength=>20),
+        "<td>", password_field(-name=>'authcode',  -size=>20, -maxlength=>20),
         to_page('Login'), "</td></tr></table>", 
 
         br,
@@ -658,7 +658,7 @@ sub print_authentication_page()
       to_page('Get Passcode'), "</td></tr>",
 
       "<tr><td>Passcode:</td>",
-      "<td>", textfield(-name=>'authcode',  -size=>20, -maxlength=>20),
+      "<td>", password_field(-name=>'authcode',  -size=>20, -maxlength=>20),
       to_page('Login'), "</td></tr></table>", 
 
       br,
