@@ -1,23 +1,33 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.15 2006/08/12 18:23:56 a14562 Exp $
+# $Id: elec.pl,v 1.16 2006/08/12 18:33:28 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
 
-# This program reads three files 
+# This program reads the following files 
 # 
-# - courses.txt (course code, name, instructor, cap, slot)
-# - students.txt (rollno, name, email, cgpa, credits)
+# - courses.txt (code, name, instructor, cap, slot, status, site, barred)
+# - students.txt (rollno, name, email, cgpa, credits, site)
 # - choices.txt (rollno, #courses, list of courses)
+# - project_students.txt (rollno)
 # 
-# and allocates courses as per student preferences.
-# 
-# seniority (based on batch and #credits), course priority, and CGPA are considered.
+# and allocates courses as per student preferences
+# for Phases 2 and 3 of the allocation process.
+#
+# The electives allocation process is explained in detail at:
+# http://sankara.net/pgsem/electives-allocation.html
+#
+# The following factors determine the student "rank" for a course:
+#
+# seniority (based on batch and #credits)
+# course priority
+# CGPA
 #
 # conditions (at the end of allocation):
+# TODO: sync up with http://sankara.net/pgsem/electives-allocation.html
 # 
 # #students allotted per course < cap for the course
 # #courses allotted to student <= #courses requested
@@ -57,13 +67,18 @@ use strict;
 
 use Spreadsheet::WriteExcel;
 
-my $title = "PGSEM 2006-07 Q1";
+# begin configurable information
+
+my $title = "PGSEM 2006-07 Q2";
 my $footer = "Indian Institute of Management, Bangalore";
 
 # Change according to current phase
 my $phase = 3;
 
-# constants
+# end configurable information
+
+# begin constants
+
 my $default_cap = 65;
 my $default_mincap = 15;
 my $default_status = 'R'; # running
@@ -82,6 +97,8 @@ my $current_year = 2006;
 my $max_courses = 4;
 my $give_priority_to_seniors = 1;
 my $give_priority_to_cgpa = 1;
+
+# end constants
 
 my %courses;
 # courses hash:
@@ -270,7 +287,7 @@ sub load_courses($)
         $mincap ||= $default_mincap;
         $status ||= $default_status;
         $site ||= $default_site;
-	$code .= "-" . $site;
+	    $code .= "-" . $site;
 
         if (defined($courses{$code})) {
             err_print("error:$file:$.: course '$code' already defined");
