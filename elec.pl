@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.16 2006/08/12 18:33:28 a14562 Exp $
+# $Id: elec.pl,v 1.17 2006/08/12 20:17:23 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -66,86 +66,11 @@
 use strict;
 
 use Spreadsheet::WriteExcel;
-
-# begin configurable information
-
-my $title = "PGSEM 2006-07 Q2";
-my $footer = "Indian Institute of Management, Bangalore";
-
-# Change according to current phase
-my $phase = 3;
-
-# end configurable information
-
-# begin constants
-
-my $default_cap = 65;
-my $default_mincap = 15;
-my $default_status = 'R'; # running
-my $default_site = 'B'; # Bangalore
-my $default_cgpa = 3.0; # CGPA used for allocation if data not available
-
-my $max_cgpa = 4.0;
-my $min_cgpa_four_courses = 2.75;
-my $min_credits = 0; 
-
-my $credits_pass = 93; 
-# >=93 credits already taken => no seniority preference
-# latest joining year upto which seniority preference is given
-my $current_year = 2006;
-
-my $max_courses = 4;
-my $give_priority_to_seniors = 1;
-my $give_priority_to_cgpa = 1;
-
-# end constants
-
-my %courses;
-# courses hash:
-# key is course code
-# value is a hash keyed by attributes:
-# name, instructor, cap, slot
-# invariants:
-# code is never ''
-# name, instructor never are undef but can be ''
-# cap is always a valid number
-# slot can be undef
-
-my %students;
-# students hash:
-# key is rollno
-# value is a hash keyed by attributes:
-# name, email, cgpa, credits, seniority, site (all loaded at the beginning) 
-# and slot which is a hash keyed by integers 1..$max_slots
-# where the value can be undef or 1
-# 
-# invariants:
-# name, email are never undef but can be ''
-# cgpa can be undef
-
-my %project_students;
-my %p1_students;
-
-
-my %choices;
-# choices hash:
-# key is rollno; exists in students hash
-# value is a hash keyed by attributes:
-# ncourses - number of courses applied for
-# preflist - list of course codes in the order of preference
-#            course code exists in courses hash
-
-my %p3choices;
-# choices hash:
-# key is rollno; exists in students hash
-# value is a hash keyed by attributes:
-# trtype - transaction type =~ /^[ADB]$/
-# add - course to be added, defined if trtype =~ /^[AB]$/
-# drop - course to be dropped, defined if trtype =~ /^[DB]$/
-# status =~ /^[PDN]$/ meanings - Pending, Done, Not possible
+use ElecConfig;
+use Elec;
 
 my %allocation;
-# allocation hash:
+# allocation hash (computed hash):
 # key is course code
 # value is a hash keyed by attributes:
 # studentlist - an array sorted by (seniority, priority, grade)
@@ -156,25 +81,25 @@ my %allocation;
 # rollno, priority, cgpa
 
 my %p3salloc;
-# allocation hash as input for phase 3 by students
+# allocation hash (computed) as input for phase 3 by students
 # key is student roll no
 # value is a hash keyed by attributes:
 # courses - a hash on course ids allotted
 
 my %p3calloc;
-# allocation hash as input for phase 3 by courses
+# allocation hash (computed) as input for phase 3 by courses
 # key is course id
 # nstudents is no of students
 # students - a hash on student rollno allotted
 
 my %courses_capped;
-# list of courses capped
+# list of courses capped (computed)
 # key is course code
 # value is a hash keyed by attributes
 # year, priority, cgpa at which the course capped
 
 my @ranklist; 
-# ranklist covering all students (not specific to courses)
+# ranklist (computed) covering all students (not specific to courses)
 
 # Excel properties
 my $rollno_width = 15;
@@ -187,333 +112,6 @@ my $complete_color = '#C0C0C0';
 my $sc_color = '#FF00FF';
 my $ot_color = '#FF9900';
 my $dropped_color = '#008080';
-
-sub err_print($)
-{
-    my $msg = shift;
-    print $msg, "\n";
-}
-
-sub skip_line($)
-{
-    my $line = shift;
-    return 1 if ($line =~ /^\s*\#/); # comment lines
-    return 1 if ($line =~ /^\s*$/); # blank lines
-    return 0;
-}
-
-# load roll numbers of students who registered in phase 1
-sub load_p1_students ($)
-{
-    my $filename = shift;
-
-    open IN, "<$filename" or die "Can't open $filename: $!";
-
-    while (<IN>) {
-       chomp;
-       s/;.*//;
-       s/^\s*//g;
-       s/\s*$//g;
-       $p1_students{$_} = 1;
-       print STDERR "*** Phase 1 student: |$_|\n";
-    }
-
-    close IN;
-}
-
-# load roll numbers of students doing projects
-sub load_project_students ($)
-{
-    my $filename = shift;
-
-    open IN, "<$filename" or die "Can't open $filename: $!";
-
-    while (<IN>) {
-       chomp;
-       s/^\s*//g;
-       s/\s*$//g;
-       $project_students{$_} = 1;
-       print STDERR "*** Project student: $_\n";
-    }
-
-    close IN;
-}
-
-sub load_courses($)
-{
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-        chomp;
-        next if skip_line($_);
-        my ($code, $name, $instructor, $cap, $slot, $status, $site, $barred, $mincap) = 
-            split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-        $cap = undef if (defined($cap) && ($cap eq ''));
-        $mincap = undef if (defined($mincap) && ($mincap eq ''));
-        $slot = undef if (defined($slot) && ($slot eq ''));
-        $status = undef if (defined($status) && ($status eq ''));
-        $site = undef if (defined($site) && ($site eq ''));
-        # status can be 'A' (active) or 'D' dropped
-
-        if (!defined($code) || ($code eq "")) {
-            err_print("error:$file:$.: no course code");
-            next;
-        }
-
-        if (defined($cap) && ($cap < 1)) {
-            err_print("error:$file:$.: invalid cap '$cap'");
-            next;
-        }
-
-        if (defined($cap) && defined($mincap) && ($cap <= $mincap)) {
-            err_print("error:$file:$.: invalid cap mincap combination '$cap', '$mincap'");
-            next;
-        }
-
-        if (defined($status) && !($status =~ /[ADN]/)) {
-            err_print("error:$file:$.: invalid status '$status'");
-            next;
-        }
-
-        if (defined($site) && !($site =~ /^.$/)) {
-            err_print("error:$file:$.: invalid site '$site'");
-            next;
-        }
-
-        $name ||= "";
-        $instructor ||= "";
-        $cap ||= $default_cap;
-        $mincap ||= $default_mincap;
-        $status ||= $default_status;
-        $site ||= $default_site;
-	    $code .= "-" . $site;
-
-        if (defined($courses{$code})) {
-            err_print("error:$file:$.: course '$code' already defined");
-            next;
-        }
-
-
-        $courses{$code}{"name"} = $name;
-        $courses{$code}{"instructor"} = $instructor;
-        $courses{$code}{"cap"} = $cap;
-        $courses{$code}{"slot"} = $slot;
-        $courses{$code}{"status"} = $status;
-        $courses{$code}{"mincap"} = $mincap;
-
-    }
-    close IN;
-}
-
-sub print_courses ()
-{
-    print "=== Courses ===\n";
-    foreach my $code (sort keys %courses) {
-        print join('; ',
-            $code,
-            $courses{$code}{"name"},
-            $courses{$code}{"instructor"},
-            $courses{$code}{"cap"},
-            $courses{$code}{"slot"} || ""),
-            $courses{$code}{"mincap"}, "\n";
-    }
-    print "\n";
-}
-
-sub year_from_rollno($)
-{
-    my $rollno = shift;
-
-    my $year = substr($rollno, 0, 4);
-    if ($rollno == 2004165) {
-
-      # Special exception
-      $year = 2005;
-    }
-    $year =~ s/2021/2000/;
-    $year =~ s/2104/2001/;
-    $year =~ s/2204/2002/;
-
-    return $year;
-}
-
-sub seniority_from_rollno($)
-{
-    my ($rollno) = shift;
-    
-    my $year = year_from_rollno($rollno);
-    my $credits = $students{$rollno}{"credits"};
-    if (defined($p1_students{$rollno})) {
-
-        print "Roll number |$rollno| is p1\n";
-    }
-    else {
-
-        print "Roll number |$rollno| is not p1\n";
-    }
-    if ($credits < $credits_pass && ($phase != 2 || defined($p1_students{$rollno}))) {
-        print "Roll number $rollno, seniority: $year\n";
-        return $year;
-    } else {
-        print "Roll number $rollno, seniority: $current_year\n";
-        return $current_year;
-    }
-}
-
-sub load_students($)
-{
-    my $errors = 0;
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-        chomp;
-        next if skip_line($_);
-        my ($rollno, $name, $email, $cgpa, $credits, $site) = 
-            split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-        $cgpa = $default_cgpa if (defined($cgpa) && ($cgpa eq ''));
-        $credits = $min_credits if (defined($credits) && ($credits eq ''));
-
-        if (!defined($rollno) || ($rollno eq "")) {
-            err_print("error:$file:$.: no roll number");
-            ++$errors;
-            next;
-        }
-
-        if (defined($students{$rollno})) {
-            err_print("error:$file:$.: roll number '$rollno' already defined");
-            ++$errors;
-            next;
-        }
-
-        if (defined($cgpa) && (($cgpa < 0) || ($cgpa > $max_cgpa))) {
-            err_print("error:$file:$.: invalid cgpa '$cgpa'");
-            ++$errors;
-            next;
-        }
-
-        if (defined($credits) && ($credits < $min_credits)) {
-            err_print("error:$file:$.: invalid credits '$credits'");
-            ++$errors;
-            next;
-        }
-
-        $name ||= "";
-        $email ||= "";
-	$site ||= $default_site;
-
-        $students{$rollno}{"name"} = $name;
-        $students{$rollno}{"email"} = $email;
-        $students{$rollno}{"cgpa"} = $cgpa;
-        $students{$rollno}{"credits"} = $credits;
-        $students{$rollno}{"seniority"} = seniority_from_rollno($rollno);
-        $students{$rollno}{"site"} = $site;
-
-    }
-    close IN;
-    return $errors;
-}
-
-sub print_students ()
-{
-    print "=== Students ===\n";
-    foreach my $rollno (sort keys %students) {
-
-        print join('; ',
-            $rollno,
-            $students{$rollno}{"name"},
-            $students{$rollno}{"email"},
-            $students{$rollno}{"cgpa"},
-            $students{$rollno}{"credits"}), "\n";
-    }
-    print "\n";
-}
-
-sub load_choices($)
-{
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    LINE: while (<IN>) {
-        chomp;
-        next if skip_line($_);
-        my ($rollno, $ncourses, $courselist) = 
-            split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-        $ncourses = undef if (defined($ncourses) && ($ncourses eq ''));
-        $courselist = undef if (defined($courselist) && ($courselist eq ''));
-
-        if (!defined($rollno) || ($rollno eq "")) {
-            err_print("error:$file:$.: no roll number");
-            next;
-        }
-
-        unless (defined($students{$rollno})) {
-            err_print("error:$file:$.: roll number '$rollno' not defined");
-            next;
-        }
-
-        if (defined($choices{$rollno})) {
-            err_print("error:$file:$.: roll number '$rollno' already defined");
-            next;
-        } 
-
-        if (!defined($ncourses)) {
-            err_print("error:$file:$.: number of courses not defined");
-            next;
-        }
-
-        if (defined($ncourses) && 
-            !(($ncourses >= 1) && ($ncourses <= $max_courses))) {
-            err_print("error:$file:$.: invalid number of courses: '$ncourses'");
-            next;
-        }
-
-        if (!defined($courselist)) {
-            err_print("error:$file:$.: course list not defined");
-            next;
-        }
-
-        my @student_courses = split(/\s*,\s*/, $courselist);
-        my %student_courses;
-        foreach my $course (@student_courses) {
-
-	    $course .= "-" . $students{$rollno}{"site"};
-
-            unless (defined($courses{$course})) {
-                err_print("error:$file:$.: invalid course '$course'");
-                next LINE;
-            }
-            if (defined($student_courses{$course})) {
-                err_print("error:$file:$.: redefinition of course");
-                next LINE;
-            }
-            $student_courses{$course} = 1;
-        }
-
-        if ($ncourses > (keys %student_courses)) {
-            err_print("error:$file:$.: #choices < #courses");
-            next LINE;
-        }
-
-        $choices{$rollno}{"ncourses"} = $ncourses;
-        $choices{$rollno}{"courselist"} = \@student_courses;
-                
-    }
-    close IN;
-}
-
-sub print_choices ()
-{
-    print "=== Choices ===\n";
-    foreach my $rollno (sort keys %choices) {
-        print join('; ',
-            $rollno,
-            $choices{$rollno}{"ncourses"},
-            join(',', @{$choices{$rollno}{"courselist"}})), "\n";
-    }
-    print "\n";
-}
 
 sub by_student_rank
 {
@@ -1606,7 +1204,8 @@ sub write_p3excel ()
 
 sub main
 {
-    load_courses("courses.txt");
+    load_courses("courses-internal.txt", 1);
+
     print_courses;
 
     if ($phase == 2) {
@@ -1614,7 +1213,7 @@ sub main
       load_p1_students("choices-p1.txt");
     }
     load_students("students.txt");
-    load_project_students("project_students.txt");
+    load_project_students("project-students.txt");
     print_students;
 
     if ($phase == 1 || $phase == 2) {
