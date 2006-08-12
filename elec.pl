@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.14 2006/06/23 13:26:47 a14562 Exp $
+# $Id: elec.pl,v 1.15 2006/08/12 18:23:56 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -61,10 +61,11 @@ my $title = "PGSEM 2006-07 Q1";
 my $footer = "Indian Institute of Management, Bangalore";
 
 # Change according to current phase
-my $phase = 2;
+my $phase = 3;
 
 # constants
 my $default_cap = 65;
+my $default_mincap = 15;
 my $default_status = 'R'; # running
 my $default_site = 'B'; # Bangalore
 my $default_cgpa = 3.0; # CGPA used for allocation if data not available
@@ -117,6 +118,15 @@ my %choices;
 # preflist - list of course codes in the order of preference
 #            course code exists in courses hash
 
+my %p3choices;
+# choices hash:
+# key is rollno; exists in students hash
+# value is a hash keyed by attributes:
+# trtype - transaction type =~ /^[ADB]$/
+# add - course to be added, defined if trtype =~ /^[AB]$/
+# drop - course to be dropped, defined if trtype =~ /^[DB]$/
+# status =~ /^[PDN]$/ meanings - Pending, Done, Not possible
+
 my %allocation;
 # allocation hash:
 # key is course code
@@ -127,6 +137,18 @@ my %allocation;
 # 
 # each studentlist element is hash reference where the hash holds
 # rollno, priority, cgpa
+
+my %p3salloc;
+# allocation hash as input for phase 3 by students
+# key is student roll no
+# value is a hash keyed by attributes:
+# courses - a hash on course ids allotted
+
+my %p3calloc;
+# allocation hash as input for phase 3 by courses
+# key is course id
+# nstudents is no of students
+# students - a hash on student rollno allotted
 
 my %courses_capped;
 # list of courses capped
@@ -152,7 +174,7 @@ my $dropped_color = '#008080';
 sub err_print($)
 {
     my $msg = shift;
-    print STDERR $msg, "\n";
+    print $msg, "\n";
 }
 
 sub skip_line($)
@@ -207,10 +229,11 @@ sub load_courses($)
     while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($code, $name, $instructor, $cap, $slot, $status, $site, $barred) = 
+        my ($code, $name, $instructor, $cap, $slot, $status, $site, $barred, $mincap) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $cap = undef if (defined($cap) && ($cap eq ''));
+        $mincap = undef if (defined($mincap) && ($mincap eq ''));
         $slot = undef if (defined($slot) && ($slot eq ''));
         $status = undef if (defined($status) && ($status eq ''));
         $site = undef if (defined($site) && ($site eq ''));
@@ -223,6 +246,11 @@ sub load_courses($)
 
         if (defined($cap) && ($cap < 1)) {
             err_print("error:$file:$.: invalid cap '$cap'");
+            next;
+        }
+
+        if (defined($cap) && defined($mincap) && ($cap <= $mincap)) {
+            err_print("error:$file:$.: invalid cap mincap combination '$cap', '$mincap'");
             next;
         }
 
@@ -239,6 +267,7 @@ sub load_courses($)
         $name ||= "";
         $instructor ||= "";
         $cap ||= $default_cap;
+        $mincap ||= $default_mincap;
         $status ||= $default_status;
         $site ||= $default_site;
 	$code .= "-" . $site;
@@ -254,6 +283,7 @@ sub load_courses($)
         $courses{$code}{"cap"} = $cap;
         $courses{$code}{"slot"} = $slot;
         $courses{$code}{"status"} = $status;
+        $courses{$code}{"mincap"} = $mincap;
 
     }
     close IN;
@@ -268,7 +298,8 @@ sub print_courses ()
             $courses{$code}{"name"},
             $courses{$code}{"instructor"},
             $courses{$code}{"cap"},
-            $courses{$code}{"slot"} || ""), "\n";
+            $courses{$code}{"slot"} || ""),
+            $courses{$code}{"mincap"}, "\n";
     }
     print "\n";
 }
@@ -278,6 +309,11 @@ sub year_from_rollno($)
     my $rollno = shift;
 
     my $year = substr($rollno, 0, 4);
+    if ($rollno == 2004165) {
+
+      # Special exception
+      $year = 2005;
+    }
     $year =~ s/2021/2000/;
     $year =~ s/2104/2001/;
     $year =~ s/2204/2002/;
@@ -551,6 +587,23 @@ sub get_allotted_course($$)
     return undef;
 }
 
+sub courses_conflict($$)
+{
+    my ($c1, $c2) = @_;
+    return undef if (!defined($courses{$c1}{"slot"}));
+    return undef if (!defined($courses{$c2}{"slot"}));
+    my @c1s = split(/\s*,\s*/, $courses{$c1}{"slot"});
+    my @c2s = split(/\s*,\s*/, $courses{$c2}{"slot"});
+    for my $s1 (@c1s) {
+
+      for my $s2 (@c2s) {
+
+	return 1 if ($s1 eq $s2);
+      }
+    }
+    return undef;
+}
+
 sub fill_student_slots($$$)
 {
     my ($rollno, $slot, $course) = @_;
@@ -610,13 +663,6 @@ sub allocate_course($$$)
         return 0;
     }
 
-    if ($allocation{$course}{"nallotted"} >= $courses{$course}{"cap"}) {
-        $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "Capped";
-	++$courses_capped{$course}{"nrejected"};
-        return 0;
-    }
-
     my $slot = $courses{$course}{"slot"};
 
     my $already_allotted_course = get_allotted_course($rec, $slot);
@@ -625,6 +671,13 @@ sub allocate_course($$$)
 
         $rec->{"allotted"} = 0;
         $rec->{"reason"} = "SC:$already_allotted_course";
+        return 0;
+    }
+
+    if ($allocation{$course}{"nallotted"} >= $courses{$course}{"cap"}) {
+        $rec->{"allotted"} = 0;
+        $rec->{"reason"} = "Capped";
+	++$courses_capped{$course}{"nrejected"};
         return 0;
     }
 
@@ -1227,6 +1280,313 @@ sub compute_conflicts
     } 
 }
 
+sub load_allocations($)
+{
+    my $file = shift;
+    open IN, "<$file" or die "Can't open file $file: $!";
+    LINE: while (<IN>) {
+        chomp;
+        next if skip_line($_);
+        my ($rollno, $name, $email, $asked, $alloted, $allocationlist) = 
+            split(/\s*\;\s*/, $_) unless skip_line($_); 
+
+        $allocationlist = undef if (defined($allocationlist) && ($allocationlist eq ''));
+
+        if (!defined($rollno) || ($rollno eq "")) {
+            err_print("error:$file:$.: no roll number");
+            next;
+        }
+
+        unless (defined($students{$rollno})) {
+            err_print("error:$file:$.: roll number '$rollno' not defined");
+            next;
+        }
+
+        if (defined($p3salloc{$rollno})) {
+            err_print("error:$file:$.: roll number '$rollno' already defined");
+            next;
+        } 
+
+        if (!defined($allocationlist)) {
+            err_print("error:$file:$.: allocation list not defined");
+            next;
+        }
+
+	my %student_courses;
+	
+	for my $alloc (split(/\s*,\s*/, $allocationlist)) {
+
+          my ($course, $status) = (split(/\s*=\s*/, $alloc));
+          if ($status eq "Allotted") {
+
+            $student_courses{$course} = 1;
+	    $p3calloc{$course}{"students"}{$rollno} = 1;
+	    $p3calloc{$course}{"nstudents"}++;
+          }
+	}
+
+        $p3salloc{$rollno}{"courses"} = \%student_courses;
+    }
+    close IN;
+}
+
+sub print_allocations ()
+{
+    print "=== Allocations ===\n";
+    foreach my $rollno (sort keys %p3salloc) {
+        print join('; ',
+            $rollno,
+            join(',', keys %{$p3salloc{$rollno}{"courses"}})), "\n";
+    }
+    print "\n";
+    foreach my $course (sort keys %p3calloc) {
+        print join('; ',
+		   $course,
+		   $p3calloc{$course}{nstudents}), "\n";
+	foreach my $rollno (sort keys %{$p3calloc{$course}{"students"}}) {
+
+            print join('; ',
+                       $rollno,
+                       $students{$rollno}{"name"}), "\n";
+        }
+        print "\n";
+    }
+    print "\n";
+}
+
+
+sub load_p3choices($)
+{
+    my $file = shift;
+    open IN, "<$file" or die "Can't open file $file: $!";
+    LINE: while (<IN>) {
+        chomp;
+        next if skip_line($_);
+        my ($rollno, $trtype, $courselist) = 
+            split(/\s*\;\s*/, $_) unless skip_line($_); 
+
+        $courselist = undef if (defined($courselist) && ($courselist eq ''));
+        $trtype = undef if (defined($trtype) && ($trtype eq ''));
+
+        if (!defined($rollno) || ($rollno eq "")) {
+            err_print("error:$file:$.: no roll number");
+            next;
+        }
+
+        unless (defined($students{$rollno})) {
+            err_print("error:$file:$.: roll number '$rollno' not defined");
+            next;
+        }
+
+        if (defined($p3choices{$rollno})) {
+            err_print("error:$file:$.: roll number '$rollno' already defined");
+            next;
+        } 
+
+	if (!defined($trtype) || ($trtype !~ /^[DAB]$/)) {
+            err_print("error:$file:$.: transaction type '$trtype' invalid");
+            next;
+	}
+
+        if (!defined($courselist)) {
+            err_print("error:$file:$.: course list not defined");
+            next;
+        }
+
+	my ($drop, $add) = (undef, undef);
+	if ($trtype eq "B") {
+
+	  ($drop, $add) = split(/\s*,\s*/, $courselist);
+	  if (!defined($drop) || !defined($add)) {
+
+	    err_print("error:$file:$.: both drop and add should be given");
+            next;
+	  }
+	}
+	elsif ($trtype eq "D") {
+
+	  $drop = $courselist;
+	}
+	else {
+
+	  $add = $courselist;
+	}
+
+	$add .= "-" . $students{$rollno}{"site"} if (defined($add));
+	$drop .= "-" . $students{$rollno}{"site"} if (defined($drop));
+
+	if (defined($add) && !(defined($courses{$add}))) {
+
+	  err_print("error:$file:$.: invalid course '$add'");
+	  next;
+	}
+
+	if (defined($drop) && !(defined($courses{$drop}))) {
+
+	  err_print("error:$file:$.: invalid course '$drop'");
+	  next;
+	}
+
+	if (defined($drop) && !(defined($p3salloc{$rollno}{"courses"}{$drop}))) {
+
+	  err_print("error:$file:$.: cannot drop '$drop' for '$rollno', not allotted");
+	  next;
+	}
+
+	if ($trtype eq "A") {
+
+	  my $allowed = $max_courses - 
+	  (defined($project_students{$rollno}) ? 1 : 0) -
+	    (($students{$rollno}{'cgpa'} < $min_cgpa_four_courses) ? 1 : 0);
+	  my $allotted = (keys %{$p3salloc{$rollno}{"courses"}});
+	  if ($allotted >= $allowed) {
+
+	    err_print("error:$file:$.: cannot add '$add' for '$rollno', not allowed");
+            next;
+	  }
+	}
+
+	if ($trtype =~ /^[AB]$/) {
+
+	  my @curcourses = (keys %{$p3salloc{$rollno}{"courses"}});
+	  for my $c (@curcourses) {
+
+	    next if ($trtype eq "B" && $c eq $drop);
+	    print "Checking conflict for $rollno between $c and $add\n";
+	    if (courses_conflict($c, $add)) {
+
+	      err_print("error:$file:$.: cannot add '$add' for '$rollno', conflicts with '$c'");
+	      next LINE;
+	    }
+	  }
+	}
+	
+
+	$p3choices{$rollno}{"trtype"} = $trtype;
+	$p3choices{$rollno}{"add"} = $add if (defined($add));
+	$p3choices{$rollno}{"drop"} = $drop if (defined($drop));
+	$p3choices{$rollno}{"status"} = 'P';
+    }
+    close IN;
+}
+
+sub print_p3choices ()
+{
+    print "=== P3 choices ===\n";
+    foreach my $rollno (sort keys %p3choices) {
+        print join('; ',
+		   $rollno,
+		   $p3choices{$rollno}{"trtype"},
+		   $p3choices{$rollno}{"drop"} || "-",
+		   $p3choices{$rollno}{"add"} || "-",
+		   $p3choices{$rollno}{"status"}), "\n";
+    }
+    print "\n";
+}
+
+sub print_given_p3choices
+{
+    my $choices = shift;
+    print "=== Remaining P3 choices ===\n";
+    foreach my $rollno (@{$choices}) {
+        print join('; ',
+		   $rollno,
+		   $p3choices{$rollno}{"trtype"},
+		   $p3choices{$rollno}{"drop"} || "-",
+		   $p3choices{$rollno}{"add"} || "-",
+		   $p3choices{$rollno}{"status"}), "\n";
+    }
+    print "\n";
+}
+
+sub execute_p3request {
+
+  my $rollno = shift;
+  if ($p3choices{$rollno}{"trtype"} eq "D") {
+ 
+    my $c = $p3choices{$rollno}{"drop"};
+    if ($p3calloc{$c}{"nstudents"} > $courses{$c}{"mincap"}) {
+
+      # Possible to drop
+      $p3calloc{$c}{"nstudents"}--;
+      delete($p3calloc{$c}{"students"}{$rollno});
+      delete($p3salloc{$rollno}{"courses"}{$c});
+      $p3choices{$rollno}{"status"} = "D";
+      return 1;
+    }
+    else {
+
+      return 0;
+    }
+  }
+  if ($p3choices{$rollno}{"trtype"} eq "A") {
+ 
+    my $c = $p3choices{$rollno}{"add"};
+    if ($p3calloc{$c}{"nstudents"} < $courses{$c}{"cap"}) {
+
+      # Possible to add
+      $p3calloc{$c}{"nstudents"}++;
+      $p3calloc{$c}{"students"}{$rollno} = 1;
+      $p3salloc{$rollno}{"courses"}{$c} = 1;
+      $p3choices{$rollno}{"status"} = "D";
+      return 1;
+    }
+    else {
+
+      return 0;
+    }
+  }
+  if ($p3choices{$rollno}{"trtype"} eq "B") {
+ 
+    my $a = $p3choices{$rollno}{"add"};
+    my $d = $p3choices{$rollno}{"drop"};
+    if ($p3calloc{$a}{"nstudents"} < $courses{$a}{"cap"}
+	&& $p3calloc{$d}{"nstudents"} > $courses{$d}{"mincap"}) {
+
+      # Possible to add and drop
+      # Add
+      $p3calloc{$a}{"nstudents"}++;
+      $p3calloc{$a}{"students"}{$rollno} = 1;
+      $p3salloc{$rollno}{"courses"}{$a} = 1;
+      # Drop
+      $p3calloc{$d}{"nstudents"}--;
+      delete($p3calloc{$d}{"students"}{$rollno});
+      delete($p3salloc{$rollno}{"courses"}{$d});
+      $p3choices{$rollno}{"status"} = "D";
+      return 1;
+    }
+  }
+  return 0;
+}
+
+sub add_drop_p3choices ()
+{
+  while (1) {
+
+    my $done = 1;
+    my @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } grep { $p3choices{$_}{"status"} eq "P" } keys %p3choices;
+    last if (scalar(@p3pending) == 0);
+    print_given_p3choices(\@p3pending);
+    for my $rollno (@p3pending) {
+
+      if (execute_p3request($rollno)) {
+
+	$done = 0;
+      }
+    }
+    last if ($done);
+  }
+}
+
+sub print_remaining_p3choices ()
+{
+  print_p3choices;
+}
+
+sub write_p3excel ()
+{
+}
+
 sub main
 {
     load_courses("courses.txt");
@@ -1236,33 +1596,49 @@ sub main
 
       load_p1_students("choices-p1.txt");
     }
-    for my $s (sort keys %p1_students) {
-
-      print "P1 student: $s\n";
-    }
     load_students("students.txt");
     load_project_students("project_students.txt");
     print_students;
 
-    load_choices("choices.txt");
-    print_choices;
+    if ($phase == 1 || $phase == 2) {
+
+      load_choices("choices.txt");
+      print_choices;
 
 
-    allocate_courses;
-    print_allocation_by_course;
-    print_allocation_by_student;
+      allocate_courses;
+      print_allocation_by_course;
+      print_allocation_by_student;
 
 
-    @ranklist = sort { by_student_rank } (keys %students);
-    print join("\n", @ranklist);
-    print "\n";
+      @ranklist = sort { by_student_rank } (keys %students);
+      print join("\n", @ranklist);
+      print "\n";
 
-    write_excel();
+      write_excel();
 
-    write_allocation_by_student("allocation-internal.txt");
+      write_allocation_by_student("allocation-internal.txt");
+    }
+    else {
+
+      # phase 3 only
+
+      # load allocations as at end of p2
+      load_allocations("allocation-internal.txt");
+      print_allocations;
+
+      # load choices given in p3
+      load_p3choices("p3choices.txt");
+      print_p3choices;
+
+      add_drop_p3choices;
+      print_remaining_p3choices;
+      write_p3excel;
+
+      print_allocations;
+    }
 }
 
 main;
 
 # end of file
-
