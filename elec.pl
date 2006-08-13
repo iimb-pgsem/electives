@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.17 2006/08/12 20:17:23 a14562 Exp $
+# $Id: elec.pl,v 1.18 2006/08/13 10:51:26 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -1204,6 +1204,9 @@ sub write_p3excel ()
 
 sub main
 {
+    read_config_info("config.txt");
+    assign_config_info;
+
     load_courses("courses-internal.txt", 1);
 
     print_courses;

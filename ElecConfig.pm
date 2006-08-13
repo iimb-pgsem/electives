@@ -1,5 +1,5 @@
 
-# $Id: ElecConfig.pm,v 1.1 2006/08/12 20:17:05 a14562 Exp $
+# $Id: ElecConfig.pm,v 1.2 2006/08/13 10:51:26 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -19,9 +19,10 @@ require Exporter;
 # Do not simply export all your public functions/methods/constants.
 
 @EXPORT = qw(
+    $phase
+
     $title
     $footer
-    $phase
     $default_cap
     $default_mincap
     $default_status
@@ -35,38 +36,138 @@ require Exporter;
     $max_courses
     $give_priority_to_seniors
     $give_priority_to_cgpa
+
+    $default_cap
+    $default_mincap
+    $default_status
+    $default_site
+    $default_cgpa
+    $max_cgpa
+    $min_cgpa_four_courses
+    $min_credits
+    $credits_pass
+    $current_year
+    $max_courses
+    $give_priority_to_seniors
+    $give_priority_to_cgpa
+    $footer
+
+    read_config_info
+    assign_config_info
 );
 
 our $VERSION = '0.01';
 
-# begin configurable information
+# === begin configurable information ===
+# read from config.txt using read_config_info and assign_config_info
 
-# Change according to current phase
+our %config_info;
 
-our $title = "PGSEM 2006-07 Q2";
-our $footer = "Indian Institute of Management, Bangalore";
+# ==== shared information
+our $phase;
 
-our $phase = 2;
+# === CGI information
 
-our $default_cap = 65;
-our $default_mincap = 15;
-our $default_status = 'R'; # running
-our $default_site = 'B'; # Bangalore
-our $default_cgpa = 3.0; # CGPA used for allocation if data not available
+our $adminpassword;
+our $login;
+our $password;
+our $datasource;
+our $dblogin;
+our $dbpassword;
 
-our $max_cgpa = 4.0;
-our $min_cgpa_four_courses = 2.75;
-our $min_credits = 0; 
+our $quarter_str;
+our $quarter_starts_str; # text field for printing
 
-our $credits_pass = 93; 
-# >=93 credits already taken => no seniority preference
-# latest joining year upto which seniority preference is given
-our $current_year = 2006;
+our $send_email;
+our $pop_required;
+our $deadline;
+our $deadline_str; # derived from deadline
 
-our $max_courses = 4;
-our $give_priority_to_seniors = 1;
-our $give_priority_to_cgpa = 1;
+our $moodle_url;
 
-# end configurable information
+our $title; # derived variable
+
+# === internal information
+
+our $default_cap;
+our $default_mincap;
+our $default_status; 
+our $default_site;
+our $default_cgpa;
+
+our $max_cgpa;
+our $min_cgpa_four_courses;
+our $min_credits; 
+
+our $credits_pass; 
+our $current_year;
+
+our $max_courses;
+our $give_priority_to_seniors;
+our $give_priority_to_cgpa;
+
+our $footer;
+
+# === end configurable information ===
+
+use POSIX;
+
+sub read_config_info ($)
+{
+    my $file = shift;
+    open IN, "<$file" or die "Cannot read $file: $!";
+    while (<IN>) {
+        chomp;
+        next if (/^\s*$/);
+        next if (/^\s*\#/);
+        my ($key, $value) = split(/\s*=\s*/);
+        $config_info{$key} = $value;
+    }
+    close IN;
+}
+
+sub assign_config_info 
+{
+    $phase = $config_info{'phase'};
+
+    $adminpassword = $config_info{'adminpassword'};
+    $login = $config_info{'login'};
+    $password = $config_info{'password'};
+    $datasource = $config_info{'datasource'};
+    $dblogin = $config_info{'dblogin'};
+    $dbpassword = $config_info{'dbpassword'};
+    $quarter_str = $config_info{'quarter_str'};
+    $quarter_starts_str = $config_info{'quarter_starts_str'};
+    $send_email = $config_info{'send_email'};
+    $pop_required = $config_info{'pop_required'};
+
+    my $d = $config_info{'deadline'};
+    my ($year, $month, $day) = split(/-/, $d);
+    $deadline = POSIX::mktime(0, 0, 0, $day, $month - 1, $year - 1900);
+    $deadline_str = POSIX::strftime('00:00 hours %d %b, %Y', 0, 0, 0, $day, $month - 1, $year - 1900);
+
+    $moodle_url = $config_info{'moodle_url'};
+
+    # assign to derived variables
+    $title = "PGSEM " . $quarter_str . " Phase $phase Electives Submission";
+    $footer = "Indian Institute of Management, Bangalore";
+
+    $default_cap = $config_info{'default_cap'};
+    $default_mincap = $config_info{'default_mincap'};
+    $default_status = $config_info{'default_status'};
+    $default_site = $config_info{'default_site'};
+    $default_cgpa = $config_info{'default_cgpa'};
+
+    $max_cgpa = $config_info{'max_cgpa'};
+    $min_cgpa_four_courses = $config_info{'min_cgpa_four_courses'};
+    $min_credits = $config_info{'min_credits'};
+    $credits_pass = $config_info{'credits_pass'};
+    $current_year = $config_info{'current_year'};
+    $max_courses = $config_info{'max_courses'};
+    $give_priority_to_seniors = $config_info{'give_priority_to_seniors'};
+    $give_priority_to_cgpa = $config_info{'give_priority_to_cgpa'};
+}
+
+1;
 
 # end of file

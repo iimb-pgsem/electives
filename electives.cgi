@@ -1,6 +1,6 @@
 #! perl -w
 
-# $Id: electives.cgi,v 1.21 2006/08/13 09:57:15 a14562 Exp $
+# $Id: electives.cgi,v 1.22 2006/08/13 10:51:27 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -17,73 +17,11 @@ use FindBin;
 use DBI;
 use POSIX qw(strftime);
 
+use ElecConfig;
+use ElecUtils;
+use Elec;
+
 my $config_dir = "$FindBin::Bin"; # at least for the present
-
-# === begin configurable information ===
-# read from config.txt using read_config_info and assign_config_info
-
-my %config_info;
-
-my $adminpassword;
-my $login;
-my $password;
-my $datasource;
-my $dblogin;
-my $dbpassword;
-
-my $quarter_str;
-my $quarter_starts_str; # text field for printing
-my $phase;
-
-my $send_email;
-my $pop_required;
-my $deadline;
-my $deadline_str; # derived from deadline
-
-my $moodle_url;
-
-my $title; # derived variable
-
-# === end configurable information ===
-
-sub read_config_info ($)
-{
-    my $file = shift;
-    open IN, "<$file" or die "Cannot read $file: $!";
-    while (<IN>) {
-        chomp;
-        next if (/^\s*$/);
-        next if (/^\s*\#/);
-        my ($key, $value) = split(/\s*=\s*/);
-        $config_info{$key} = $value;
-    }
-    close IN;
-}
-
-sub assign_config_info 
-{
-    $adminpassword = $config_info{'adminpassword'};
-    $login = $config_info{'login'};
-    $password = $config_info{'password'};
-    $datasource = $config_info{'datasource'};
-    $dblogin = $config_info{'dblogin'};
-    $dbpassword = $config_info{'dbpassword'};
-    $quarter_str = $config_info{'quarter_str'};
-    $quarter_starts_str = $config_info{'quarter_starts_str'};
-    $phase = $config_info{'phase'};
-    $send_email = $config_info{'send_email'};
-    $pop_required = $config_info{'pop_required'};
-
-    my $d = $config_info{'deadline'};
-    my ($year, $month, $day) = split(/-/, $d);
-    $deadline = POSIX::mktime(0, 0, 0, $day, $month - 1, $year - 1900);
-    $deadline_str = POSIX::strftime('00:00 hours %d %b, %Y', 0, 0, 0, $day, $month - 1, $year - 1900);
-
-    $moodle_url = $config_info{'moodle_url'};
-
-    # assign to derived variables
-    $title = "PGSEM " . $quarter_str . " Phase $phase Electives Submission";
-}
 
 my $page;
 
@@ -114,12 +52,6 @@ my %p3states = (
              );
 
 
-# === below to be moved to a library module ===
-
-my %students;
-my %courses;
-my $max_cgpa = 4.0;
-
 my %p3salloc;
 # allocation hash as input for phase 3 by students
 # key is student roll no
@@ -131,162 +63,6 @@ my %p3calloc;
 # key is course id
 # nstudents is no of students
 # students - a hash on student rollno allotted
-
-sub err_print($)
-  {
-    my $msg = shift;
-    # print STDERR $msg, "\n";
-    carp($msg);
-  }
-
-sub skip_line($)
-  {
-    my $line = shift;
-    return 1 if ($line =~ /^\s*\#/); # comment lines
-    return 1 if ($line =~ /^\s*$/); # blank lines
-    return 0;
-  }
-
-sub year_from_rollno($)
-{
-    my $rollno = shift;
-
-    my $year = substr($rollno, 0, 4);
-    $year =~ s/2021/2000/;
-    $year =~ s/2104/2001/;
-    $year =~ s/2204/2002/;
-
-    return $year;
-}
-
-sub load_students($)
-  {
-    my $errors = 0;
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-      chomp;
-      next if skip_line($_);
-      my ($rollno, $name, $email, $cgpa, $credits, $site) = 
-        split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-      $cgpa = undef if (defined($cgpa) && ($cgpa eq ''));
-      $site = undef if (defined($site) && ($site eq ''));
-
-      if (!defined($rollno) || ($rollno eq "")) {
-        err_print("error:$file:$.: no roll number");
-        ++$errors;
-        next;
-      }
-
-      if (defined($students{$rollno})) {
-        err_print("error:$file:$.: roll number '$rollno' already defined");
-        ++$errors;
-        next;
-      }
-
-      if (defined($cgpa) && (($cgpa < 0) || ($cgpa > $max_cgpa))) {
-        err_print("error:$file:$.: invalid cgpa '$cgpa'");
-        ++$errors;
-        next;
-      }
-
-      if (!defined($site) || ($site eq "")) {
-        err_print("error:$file:$.: site undefined for $rollno");
-        ++$errors;
-        next;
-      }
-
-      $name ||= "";
-      $email ||= "";
-
-      $students{$rollno}{"name"} = $name;
-      $students{$rollno}{"email"} = $email;
-      $students{$rollno}{"cgpa"} = $cgpa;
-      $students{$rollno}{"site"} = $site;
-
-    }
-    close IN;
-
-    return $errors;
-  }
-
-sub print_students ()
-  {
-    print "=== Students ===\n";
-    foreach my $rollno (sort keys %students) {
-      print join('; ',
-                 $rollno,
-                 $students{$rollno}{"name"},
-                 $students{$rollno}{"email"},
-                 $students{$rollno}{"cgpa"},
-                 $students{$rollno}{"credits"},
-                 $students{$rollno}{"site"} || ""), "\n";
-    }
-    print "\n";
-  }
-
-sub load_courses($)
-  {
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-      chomp;
-      next if skip_line($_);
-      my ($rawcode, $name, $instructor, $cap, $slot, $dummy, $sites, $rbatches) = 
-        split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-      $cap = undef if (defined($cap) && ($cap eq ''));
-      $slot = undef if (defined($slot) && ($slot eq ''));
-      $sites =~ s/\+/\,/g;
-
-      my @sites_list = split(/\,/, $sites);
-      # foreach my $site (@sites_list) {
-
-          # my $code = $rawcode . "-" . $site;
-          my $code = $rawcode;
-
-          if (!defined($code) || ($code eq "")) {
-            err_print("error:$file:$.: no course code");
-            next;
-          }
-
-          if (defined($courses{$code})) {
-            err_print("error:$file:$.: course '$code' already defined");
-            next;
-          }
-
-          $name ||= "";
-          $instructor ||= "";
-
-          $courses{$code}{"name"} = $name;
-          $courses{$code}{"instructor"} = $instructor;
-          $courses{$code}{"cap"} = $cap;
-          $courses{$code}{"slot"} = $slot;
-          $courses{$code}{"sites"} = $sites;
-          $courses{$code}{"distributed"} = (@sites_list > 1 ? 1: 0);
-          $courses{$code}{"rbatches"} = $rbatches;
-      # }
-    }
-
-    close IN;
-  }
-
-sub print_courses ()
-  {
-    print "=== Courses ===\n";
-    foreach my $code (sort keys %courses) {
-      print join('; ',
-                 $code,
-                 $courses{$code}{"name"},
-                 $courses{$code}{"instructor"},
-                 $courses{$code}{"cap"},
-                 $courses{$code}{"sites"},
-                 $courses{$code}{"rbatch"},
-                 $courses{$code}{"slot"} || ""), "\n";
-    }
-    print "\n";
-  }
 
 sub load_allocations($)
 {
@@ -340,8 +116,6 @@ sub load_allocations($)
 
     return 0;
 }
-
-# === above to be moved to a library module === 
 
 sub to_page ($)
   {
@@ -637,8 +411,8 @@ sub print_authentication_page()
 
     my $site = $students{$rollno}{'site'};
     my $displayed_site;
-    $displayed_site = 'Bangalore' if ($site eq 'B');
-    $displayed_site = 'Chennai' if ($site eq 'C');
+    $displayed_site = 'Bangalore' if ($site =~ /B/);
+    $displayed_site = 'Chennai' if ($site =~ /C/);
 
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
@@ -836,8 +610,11 @@ sub print_electives_page ()
 
     my %courses_for_student;
 
+    print "Here";
+    return;
+
     foreach my $course (keys %courses) {
-      my $course_sites = $courses{$course}{"sites"};
+      my $course_sites = $courses{$course}{"site"};
       my $student_can_take_course = 0;
       if (index($course_sites, $site) >= 0) {
           $student_can_take_course = 1;
@@ -851,8 +628,8 @@ sub print_electives_page ()
     }
       
     my $displayed_site;
-    $displayed_site = 'Bangalore' if ($site eq 'B');
-    $displayed_site = 'Chennai' if ($site eq 'C');
+    $displayed_site = 'Bangalore' if ($site =~ /B/);
+    $displayed_site = 'Chennai' if ($site =~ /C/);
 
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
@@ -861,7 +638,7 @@ sub print_electives_page ()
     print "<tr><td>Site:</td><td>$displayed_site</td></tr>";
     print "</table>\n";
    
-    load_courses("$config_dir/courses.txt");
+    load_courses("$config_dir/courses.txt", 0);
     
     print
       start_form(),
@@ -893,7 +670,7 @@ sub print_electives_page ()
     
       keys %courses) {
 
-      my $sites = $courses{$course}{"sites"};
+      my $sites = $courses{$course}{"site"};
       my $sites_displayed = '';
       if ($courses{$course}{"distributed"}) {
           $sites_displayed = "Distributed";
@@ -907,7 +684,7 @@ sub print_electives_page ()
       my $bgcolor = 'white';
 
       if (index($sites, $site) >= 0) {
-        # B =~ B, B =~ B,C, C =~ C, C =~ B,C
+        # B =~ B, B =~ B+C, C =~ C, C =~ B+C
         $student_can_take_course = 1;
       }
      
@@ -1028,7 +805,7 @@ sub available_courses_for_student ($)
   my @available_courses_for_student;
 
   foreach my $course (keys %courses) {
-    my $course_sites = $courses{$course}{"sites"};
+    my $course_sites = $courses{$course}{"site"};
     my $student_can_take_course = 0;
     if (index($course_sites, $site) >= 0) {
         $student_can_take_course = 1;
@@ -1060,7 +837,7 @@ sub menulist_from_courselist
     { my $val = $courses{$a}{"slot"} <=> $courses{$b}{"slot"};
       return $val || ($a cmp $b) } @clist) {
 
-    my $sites = $courses{$course}{"sites"};
+    my $sites = $courses{$course}{"site"};
     my $sites_displayed = '';
     if ($courses{$course}{"distributed"}) {
         $sites_displayed = "Distributed";
@@ -1131,7 +908,7 @@ sub print_changes_page ()
     }
 
     load_students("$config_dir/students.txt");
-    load_courses("$config_dir/courses.txt");
+    load_courses("$config_dir/courses.txt", 0);
     load_allocations("$config_dir/allocation-internal.txt");
    
     my @droplist = get_drop_list($rollno);
@@ -1441,8 +1218,8 @@ sub print_p2ack_page ()
 
     my $site = $students{$rollno}{'site'};
     my $displayed_site;
-    $displayed_site = 'Bangalore' if ($site eq 'B');
-    $displayed_site = 'Chennai' if ($site eq 'C');
+    $displayed_site = 'Bangalore' if ($site =~ /B/);
+    $displayed_site = 'Chennai' if ($site =~ /C/);
 
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";
@@ -1460,7 +1237,7 @@ sub print_p2ack_page ()
 
     my @choices;
 
-    load_courses("$config_dir/courses.txt");
+    load_courses("$config_dir/courses.txt", 0);
 
     my %choices;
     my $sepfound = 0;
@@ -1468,7 +1245,7 @@ sub print_p2ack_page ()
     my %courses_for_student;
 
     foreach my $course (keys %courses) {
-      my $course_sites = $courses{$course}{"sites"};
+      my $course_sites = $courses{$course}{"site"};
       my $student_can_take_course = 0;
       if (index($course_sites, $site) >= 0) {
           $student_can_take_course = 1;
@@ -1613,7 +1390,7 @@ sub print_p3ack_page ()
 
     return unless (is_authcode_ok($origrollno, $authcode));
 
-    load_courses("$config_dir/courses.txt");
+    load_courses("$config_dir/courses.txt", 0);
     load_allocations("$config_dir/allocation-internal.txt");
 
     # TODO: change the following dirty switching
@@ -1693,8 +1470,8 @@ sub print_p3ack_page ()
 
     my $site = $students{$rollno}{'site'};
     my $displayed_site;
-    $displayed_site = 'Bangalore' if ($site eq 'B');
-    $displayed_site = 'Chennai' if ($site eq 'C');
+    $displayed_site = 'Bangalore' if ($site =~ /B/);
+    $displayed_site = 'Chennai' if ($site =~ /C/);
 
     print "<table>\n";
     print "<tr><td>Roll Number:</td><td>$rollno</td></tr>\n";

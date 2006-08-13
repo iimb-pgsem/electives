@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.1 2006/08/12 20:17:05 a14562 Exp $
+# $Id: Elec.pm,v 1.2 2006/08/13 10:51:26 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -122,19 +122,9 @@ sub seniority_from_rollno($)
     
     my $year = year_from_rollno($rollno);
     my $credits = $students{$rollno}{"credits"};
-    if (defined($p1_students{$rollno})) {
-
-        print "Roll number |$rollno| is p1\n";
-    }
-    else {
-
-        print "Roll number |$rollno| is not p1\n";
-    }
     if ($credits < $credits_pass && ($phase != 2 || defined($p1_students{$rollno}))) {
-        print "Roll number $rollno, seniority: $year\n";
         return $year;
     } else {
-        print "Roll number $rollno, seniority: $current_year\n";
         return $current_year;
     }
 }
@@ -152,7 +142,6 @@ sub load_p1_students ($)
        s/^\s*//g;
        s/\s*$//g;
        $p1_students{$_} = 1;
-       print STDERR "*** Phase 1 student: |$_|\n";
     }
 
     close IN;
@@ -170,7 +159,6 @@ sub load_project_students ($)
        s/^\s*//g;
        s/\s*$//g;
        $project_students{$_} = 1;
-       print STDERR "*** Project student: $_\n";
     }
 
     close IN;
@@ -194,6 +182,7 @@ sub load_courses($$)
         $status = undef if (defined($status) && ($status eq ''));
         $site = undef if (defined($site) && ($site eq ''));
         # status can be 'A' (active) or 'D' dropped
+        my @sites_list = split(/\+/, $site);
 
         if (!defined($code) || ($code eq "")) {
             err_print("error:$file:$.: no course code");
@@ -238,6 +227,8 @@ sub load_courses($$)
         $courses{$code}{"instructor"} = $instructor;
         $courses{$code}{"cap"} = $cap;
         $courses{$code}{"slot"} = $slot;
+        $courses{$code}{"site"} = $site;
+        $courses{$code}{"distributed"} = (@sites_list > 1 ? 1: 0);
         $courses{$code}{"status"} = $status;
         $courses{$code}{"mincap"} = $mincap;
 
