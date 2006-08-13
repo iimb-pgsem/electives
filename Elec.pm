@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.3 2006/08/13 11:38:22 a14562 Exp $
+# $Id: Elec.pm,v 1.4 2006/08/13 11:51:17 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -230,6 +230,7 @@ sub load_courses($$)
         $courses{$code}{"cap"} = $cap;
         $courses{$code}{"slot"} = $slot;
         $courses{$code}{"site"} = $site;
+        $courses{$code}{"barred"} = $barred;
         $courses{$code}{"distributed"} = (@sites_list > 1 ? 1: 0);
         $courses{$code}{"status"} = $status;
         $courses{$code}{"mincap"} = $mincap;
