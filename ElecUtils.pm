@@ -1,5 +1,5 @@
 
-# $Id: ElecUtils.pm,v 1.1 2006/08/12 20:17:05 a14562 Exp $
+# $Id: ElecUtils.pm,v 1.2 2006/08/13 11:52:43 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -28,8 +28,6 @@ require Exporter;
 );
 
 my $VERSION = '0.01';
-
-use strict;
 
 sub err_print($)
 {
