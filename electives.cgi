@@ -1,6 +1,6 @@
-#!perl -w
+#!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.23 2006/08/13 11:53:29 a14562 Exp $
+# $Id: electives.cgi,v 1.24 2006/08/13 13:56:06 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -326,7 +326,7 @@ sub send_mail_sendmail($$$$$)
 
     my ($rollno, $from, $to, $subject, $body) = @_;
 
-    my $sendmail = "/usr/sbin/sendmail -t";
+    my $sendmail = "/usr/sbin/sendmail $to";
 
     my $errors = 0;
 
@@ -398,6 +398,9 @@ sub print_authentication_page()
     $rollno = param('rollno');
 
     my $errors = load_students("$config_dir/students.txt");
+
+    my $origrollno = $rollno; # preserve admin: prefix if one exists
+    $rollno =~ s/^admin://;
 
     unless (defined($students{$rollno})) {
       print br, "Error: roll number '$rollno' is not present in the database.", br,
@@ -733,8 +736,8 @@ sub print_electives_page ()
    print
         br, "Number of elective courses you are planning to take: ", "<blink>*</blink>", 
           popup_menu(-name=>'ncourses', 
-                     -values=>['-', '1', '2', '3', '4'],
-                     -default=>($rv == 0 ? $rec->{"ncourses"} : '-')), br, br;
+                     -values=>['-', '0', '1', '2', '3', '4'],
+                     -default=>($history ? $rec->{"ncourses"} : '-')), br, br;
    
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
@@ -1195,13 +1198,8 @@ sub print_p2ack_page ()
    
     my $errors = load_students("$config_dir/students.txt");
 
-    unless (defined($students{$rollno})) {
-      print br, "Error: roll number '$rollno' is not present in the database", 
-        br, local_end_html();
-      return;
-    }
-
-    return unless (is_authcode_ok($rollno, $authcode));
+    my $origrollno = $rollno; # preserve admin: prefix if one exists
+    $rollno =~ s/^admin://;
 
     unless (defined($students{$rollno})) {
       print br, "Error: roll number '$rollno' is not present in the database.", br,
@@ -1211,6 +1209,8 @@ sub print_p2ack_page ()
         br, local_end_html();
       return;
     }
+
+    return unless (is_authcode_ok($origrollno, $authcode));
 
     my $site = $students{$rollno}{'site'};
     my $displayed_site;
@@ -1225,7 +1225,7 @@ sub print_p2ack_page ()
     print "</table>\n";
     print br;
 
-    unless ($ncourses =~ /[1234]/) {
+    unless ($ncourses =~ /[01234]/) {
         print "Error: invalid number of courses", br, local_end_html();
         log_db("FAIL: preferences: invalid number of courses: rollno=$rollno");
         return;
@@ -1292,6 +1292,13 @@ sub print_p2ack_page ()
       $sepfound = 1 if ($code =~ /^-/); # remains set
     }
 
+    if (($ncourses == 0) && (@choices > 0)) {
+        print br, "Error: number of courses ($ncourses) does not ",
+            "equal the number of preferences (", scalar(@choices), ") given.";
+        print br, local_end_html();
+        return;
+    }
+
     if ($ncourses > @choices) {
         print br, "Error: number of courses ($ncourses) is greater than ",
             "the number of preferences (", scalar(@choices), ") given.";
@@ -1310,14 +1317,14 @@ sub print_p2ack_page ()
     return if ($rv != 0);
 
     my $from = "PGSEM Electives Submission \<pgsemelectives\@sankara\.net\>";
-    my $subject = "Phase 2 course preferences";
+    my $subject = "Phase $phase elective course preferences";
 
     my $body = "\n";
-    $body .= "Phase 2 course preferences\n\n";
+    $body .= "Phase $phase elective course preferences\n\n";
     $body .= "Roll Number: $rollno\n";
     $body .= "Name: $students{$rollno}{'name'}\n";
     $body .= "Site: $displayed_site\n\n";
-    $body .= "Number of courses: $rec->{'ncourses'}\n\n";
+    $body .= "Number of courses: " . ($rec->{'ncourses'} || "0") . "\n\n";
     $body .= "Course preferences:\n";
     my $index = 1;
     foreach my $course (@{$rec->{'courses'}}) {
@@ -1492,7 +1499,7 @@ sub print_p3ack_page ()
     my $subject = "Phase 3 Change Request";
 
     my $body = "\n";
-    $body .= "Phase 3 course preferences\n\n";
+    $body .= "Phase 3 elective course preferences\n\n";
     $body .= "Roll Number: $rollno\n";
     $body .= "Name: $students{$rollno}{'name'}\n";
     $body .= "Site: $displayed_site\n\n";
