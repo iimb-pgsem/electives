@@ -1,6 +1,6 @@
-#!/usr/bin/perl -w
+#! perl -w
 
-# $Id: electives.cgi,v 1.19 2006/06/24 19:37:47 a14562 Exp $
+# $Id: electives.cgi,v 1.20 2006/08/13 07:55:20 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -17,33 +17,73 @@ use FindBin;
 use DBI;
 use POSIX qw(strftime);
 
-# === begin sensitive information ===
-my $login = '';
-my $password = '';
-my $datasource = "DBI:mysql:sankara_q42005";
-my $dblogin = 'sankara_sankar';
-my $dbpassword = 'sankar123';
-my $adminpassword = "REDACTED_CREDENTIAL";
-# === end sensitive information ===
+my $config_dir = "$FindBin::Bin"; # at least for the present
 
 # === begin configurable information ===
-my $quarter_str = "2006-07 Quarter 1 (June - August 2006)";
-my $quarter_starts_str = "June 2006"; # text field for printing
-my $phase = 3;
-my $send_email = 1;
-my $pop_required = 0;
-my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM " . $quarter_str . " Phase $phase Electives Submission";
-my @submission_deadlines_str = 
-  # TODO: use only POSIX times and make strings out of them (see below)
-  ("24:00 IST, Tuesday, 2 May, 2006",
-   "24:00 IST, Monday, 15 May, 2006",
-   "24:00 IST, Monday, 26 June, 2006");
-my @submission_deadlines = 
-  (POSIX::mktime(0, 00, 00, 03, 5, 106),
-   POSIX::mktime(0, 00, 00, 16, 6, 106),
-   POSIX::mktime(0, 00, 00, 25, 6, 106));
-# === end configurable information
+# read from config.txt using read_config_info and assign_config_info
+
+my %config_info;
+
+my $adminpassword;
+my $login;
+my $password;
+my $datasource;
+my $dblogin;
+my $dbpassword;
+
+my $quarter_str;
+my $quarter_starts_str; # text field for printing
+my $phase;
+
+my $send_email;
+my $pop_required;
+my $deadline;
+my $deadline_str; # derived from deadline
+
+my $moodle_url;
+
+my $title; # derived variable
+
+# === end configurable information ===
+
+sub read_config_info ($)
+{
+    my $file = shift;
+    open IN, "<$file" or die "Cannot read $file: $!";
+    while (<IN>) {
+        chomp;
+        next if (/^\s*$/);
+        next if (/^\s*\#/);
+        my ($key, $value) = split(/\s*=\s*/);
+        $config_info{$key} = $value;
+    }
+    close IN;
+}
+
+sub assign_config_info 
+{
+    $adminpassword = $config_info{'adminpassword'};
+    $login = $config_info{'login'};
+    $password = $config_info{'password'};
+    $datasource = $config_info{'datasource'};
+    $dblogin = $config_info{'dblogin'};
+    $dbpassword = $config_info{'dbpassword'};
+    $quarter_str = $config_info{'quarter_str'};
+    $quarter_starts_str = $config_info{'quarter_starts_str'};
+    $phase = $config_info{'phase'};
+    $send_email = $config_info{'send_email'};
+    $pop_required = $config_info{'pop_required'};
+
+    my $d = $config_info{'deadline'};
+    my ($year, $month, $day) = split(/-/, $d);
+    $deadline = POSIX::mktime(0, 0, 0, $day, $month - 1, $year - 1900);
+    $deadline_str = POSIX::strftime('00:00 hours %d %b, %Y', 0, 0, 0, $day, $month - 1, $year - 1900);
+
+    $moodle_url = $config_info{'moodle_url'};
+
+    # assign to derived variables
+    $title = "PGSEM " . $quarter_str . " Phase $phase Electives Submission";
+}
 
 my $page;
 
@@ -337,7 +377,7 @@ EOF
 <br>Submission deadline is
 EOF
 
-    print " $submission_deadlines_str[$phase - 1].";
+    print " $deadline_str.";
     print <<'EOF';
 <br><br>
 
@@ -361,37 +401,32 @@ of all other students.</font><br><br>
 EOF
     }
 
-    print <<'EOF';
+    print <<"EOF";
 
 The official rules and processes are provided in the 
-<a href="http://moodle.iimb.ernet.in/course/view.php?id=11">IIMB moodle site</a>.
+<a href=\"$moodle_url">IIMB moodle site</a>.
 These rules and processes are explained with examples 
-<a href="http://sankara.net/electives-allocation.html">here</a>.
+<a href="http://sankara.net/pgsem/electives-allocation.html">here</a>.
 </div>
 
 <div style="">The process of applying for the electives
 can be accomplished in three easy steps. These are as
-follows:<ol><li>Get a passcode: Use the form below, enter your roll
+follows:
+
+<ol>
+
+<li>Get a passcode: Use the form below, enter your roll
 number and press the "Get Passcode" button. A passcode will be e-mailed
 to you at your IIMB email id. This is necessary so as to ensure that no
 one else can enter elective choices on your behalf. 
-EOF
 
-    if ($phase == 2) {
+A passcode is valid only for a single quarter.
+You need to get a new passcode for Phase 1.
+However, once a passcode is generated in Phase 1,
+you can continue to use it for Phases 2 and 3.
+Even if you forget your passcode, you can fetch it later.</li>
 
-        print <<'EOF';
- If you have already obtained a passcode in phase 1, you can continue
-to use the same without having to generate one again.  If you have
-forgotten that passcode, please feel free to re-generate it.
-EOF
-    }
-
-    print <<'EOF';
- <font color='blue'>A passcode once obtained can be used any number of
-times spanning Phase 1, 2, and 3 for Quarter 1 electives submission.
-<i>Note: Students who have submitted choices earlier for Q4 using this
-site, need to obtain a new passcode.</i></font></li><br> <li>Login:
-You can now login by entering <b>both</b> your roll number <b>and</b>
+<li>Login: You can now login by entering <b>both</b> your roll number <b>and</b>
 this passcode and pressing the "Login" button. You will be sent to the
 elective choice page.</li><br>
 EOF
@@ -399,16 +434,16 @@ EOF
     if ($phase == 2) {
         print <<'EOF';
         <li>Choose: In the elective choice page,
-select the number of courses you wish to do, then give your choices as
-per the priority (first course is highest priority) and submit the
+select the number of elective courses you wish to do, then give your choices as
+per the priority (first elective course is highest priority) and submit the
 choices you want to take. This will acknowledge the choices you
 selected by listing them and will also send you a mail about the
-courses you chose. 
+elective courses you chose. 
 EOF
     } elsif ($phase == 3) {
         print <<'EOF';
         <li>Drop/Add/Swap: In the elective choice page,
-select the course to be addded/dropped/swapped and submit
+select the elective course to be addded/dropped/swapped and submit
 using the appropriate button.
 EOF
     }
@@ -416,10 +451,7 @@ EOF
     if ($phase == 1) {
 
         print <<'EOF';
- <font color='blue><i>Note: Please submit as many
-preferences as you wish (not just 3) since we want to estimate the
-Phase 2 demand realistically and come up with an optimal
-schedule.</i>
+<i>Note: Please submit a maximum of 3 preferences</i>.
 EOF
     }
 
@@ -1703,12 +1735,15 @@ sub print_p3ack_page ()
 
 sub main()
 {
-    # June 25, 2006, 00:00 hrs IST (that's June 24/25 night)
-    # mktime(second, minute, hour, day, month-1, year-1900)
+    read_config_info("config.txt");
+    assign_config_info;
 
-    if (time > $submission_deadlines[$phase - 1]) {
+    if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
+      foreach my $key (sort keys %config_info) {
+        print "$key => $config_info{$key}<br>\n";
+      }
       print "Phase " . $phase . " submission deadline is over.",  br;
       print "Please contact the PGSEM office for further assistance.", br;
       print br;
