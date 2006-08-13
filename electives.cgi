@@ -1,6 +1,6 @@
 #! perl -w
 
-# $Id: electives.cgi,v 1.20 2006/08/13 07:55:20 a14562 Exp $
+# $Id: electives.cgi,v 1.21 2006/08/13 09:57:15 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -89,11 +89,18 @@ my $page;
 
 my %states;
 
+my %p1states = (
+              'default' => \&print_login_page,
+              'Get Passcode' => \&print_authentication_page,
+              'Login' => \&print_electives_page,
+              'Submit Preferences' => \&print_p2ack_page
+             );
+
 my %p2states = (
               'default' => \&print_login_page,
               'Get Passcode' => \&print_authentication_page,
               'Login' => \&print_electives_page,
-              'Submit Electives' => \&print_p2ack_page
+              'Submit Preferences' => \&print_p2ack_page
              );
 
 my %p3states = (
@@ -445,13 +452,6 @@ EOF
         <li>Drop/Add/Swap: In the elective choice page,
 select the elective course to be addded/dropped/swapped and submit
 using the appropriate button.
-EOF
-    }
-
-    if ($phase == 1) {
-
-        print <<'EOF';
-<i>Note: Please submit a maximum of 3 preferences</i>.
 EOF
     }
 
@@ -949,14 +949,16 @@ sub print_electives_page ()
    my $rec = \%rec;
    my $rv = get_preferences_from_db($rollno, $rec);
 
-   if (($rv == 0) && ($rec->{'ncourses'} > 0)) {
+   my $history = ($rv == 0) && defined($rec->{'ncourses'}) && ($rec->{'ncourses'} > 0);
+
+   if ($history) {
      print "<font color='blue'>";
      print "Note: preferences you submitted earlier are shown below.";
      print "</font><br><br>\n";
    }
 
    print
-        br, "Number of courses: ", "<blink>*</blink>", 
+        br, "Number of elective courses you are planning to take: ", "<blink>*</blink>", 
           popup_menu(-name=>'ncourses', 
                      -values=>['-', '1', '2', '3', '4'],
                      -default=>($rv == 0 ? $rec->{"ncourses"} : '-')), br, br;
@@ -964,14 +966,16 @@ sub print_electives_page ()
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
 
+      last if (($phase == 1) && ($i == 3)); 
+      # only 3 choices for Phase 1 as per PGSEM office
+
       my $pref = $i + 1;
       print "Preference $pref: ";
       print popup_menu(
         -name=>"pref$pref", 
         -values=>\@courselist,
-        -default=>($rv == 0 ?
-          ($coursecode_to_menuitem{${$rec->{"courses"}}[$i]} || $courselist[0])
-          : $courselist[0]));
+        -default=>($history ? 
+        ($coursecode_to_menuitem{${$rec->{"courses"}}[$i]} || $courselist[0]) :$courselist[0]));
       print br;
     }
 
@@ -1479,6 +1483,9 @@ sub print_p2ack_page ()
       
     for (my $i = 0; $i < scalar(keys %courses_for_student); ++$i) {
 
+      last if (($phase == 1) && ($i == 3));
+      # max 3 preferences for Phase 1 as per PGSEM office
+
       my $pref = $i + 1;
       my $code = param("pref$pref");
       $code =~ s/:.+//g;
@@ -1754,7 +1761,9 @@ sub main()
 
     $page = param(".state") || "default";
 
-    if (($phase == 1) || ($phase == 2)) {
+    if ($phase == 1) {
+        %states = %p1states;
+    } elsif ($phase == 2) {
         %states = %p2states;
     } else {
         %states = %p3states;
@@ -1763,7 +1772,9 @@ sub main()
     if ($states{$page}) {
       $states{$page}->();
     } else {
-      no_such_page();
+      print header(), start_html($title), h3($title);
+      print "Internal error: unable to fetch page for \'$page\'.<br>\n";
+      print local_end_html;
     }
 }
 
