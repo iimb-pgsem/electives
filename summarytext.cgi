@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summarytext.cgi,v 1.4 2006/05/17 15:30:18 a14562 Exp $
+# $Id: summarytext.cgi,v 1.5 2006/08/13 14:37:05 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -15,146 +15,10 @@ use FindBin;
 use DBI;
 use POSIX;
 
-# === begin sensitive information ===
-my $login = '';
-my $password = '';
-my $datasource = "DBI:mysql:sankara_q42005";
-my $dblogin = 'sankara_sankar';
-my $dbpassword = 'sankar123';
-# === end sensitive information ===
+my $config_dir = "$FindBin::Bin";
 
-# === begin configurable information ===
-my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2005-06 Quarter 4 (February - April 2006) Electives Submission";
-# === end configurable information
-
-# === below to be moved to a library module ===
-
-my %students;
-my %courses;
-my $max_cgpa = 4.0;
-
-sub err_print($)
-  {
-    my $msg = shift;
-    print STDERR $msg, "\n";
-  }
-
-sub skip_line($)
-  {
-    my $line = shift;
-    return 1 if ($line =~ /^\s*\#/); # comment lines
-    return 1 if ($line =~ /^\s*$/); # blank lines
-    return 0;
-  }
-
-sub load_students($)
-  {
-    my $errors = 0;
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-      chomp;
-      next if skip_line($_);
-      my ($rollno, $name, $email, $cgpa) = 
-        split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-      $cgpa = undef if (defined($cgpa) && ($cgpa eq ''));
-
-      if (!defined($rollno) || ($rollno eq "")) {
-        err_print("error:$file:$.: no roll number");
-        ++$errors;
-        next;
-      }
-
-      if (defined($students{$rollno})) {
-        err_print("error:$file:$.: roll number '$rollno' already defined");
-        ++$errors;
-        next;
-      }
-
-      if (defined($cgpa) && (($cgpa < 0) || ($cgpa > $max_cgpa))) {
-        err_print("error:$file:$.: invalid cgpa '$cgpa'");
-        ++$errors;
-        next;
-      }
-
-      $name ||= "";
-      $email ||= "";
-
-      $students{$rollno}{"name"} = $name;
-      $students{$rollno}{"email"} = $email;
-      $students{$rollno}{"cgpa"} = $cgpa;
-
-    }
-    close IN;
-
-    return $errors;
-  }
-
-sub print_students ()
-  {
-    print "=== Students ===\n";
-    foreach my $rollno (sort keys %students) {
-      print join('; ',
-                 $rollno,
-                 $students{$rollno}{"name"},
-                 $students{$rollno}{"email"},
-                 $students{$rollno}{"cgpa"} || ""), "\n";
-    }
-    print "\n";
-  }
-
-sub load_courses($)
-  {
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-      chomp;
-      next if skip_line($_);
-      my ($code, $name, $instructor, $cap, $slot) = 
-        split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-      $cap = undef if (defined($cap) && ($cap eq ''));
-      $slot = undef if (defined($slot) && ($slot eq ''));
-
-      if (!defined($code) || ($code eq "")) {
-        err_print("error:$file:$.: no course code");
-        next;
-      }
-
-      if (defined($courses{$code})) {
-        err_print("error:$file:$.: course '$code' already defined");
-        next;
-      }
-
-      $name ||= "";
-      $instructor ||= "";
-
-      $courses{$code}{"name"} = $name;
-      $courses{$code}{"instructor"} = $instructor;
-      $courses{$code}{"cap"} = $cap;
-      $courses{$code}{"slot"} = $slot;
-
-    }
-    close IN;
-  }
-
-sub print_courses ()
-  {
-    print "=== Courses ===\n";
-    foreach my $code (sort keys %courses) {
-      print join('; ',
-                 $code,
-                 $courses{$code}{"name"},
-                 $courses{$code}{"instructor"},
-                 $courses{$code}{"cap"},
-                 $courses{$code}{"slot"} || ""), "\n";
-    }
-    print "\n";
-  }
-
-# === above to be moved to a library modele === 
+use ElecConfig;
+use Elec;
 
 sub local_end_html()
 {
@@ -168,24 +32,27 @@ EOF
 
 sub main()
 {
+    read_config_info("config.txt");
+    assign_config_info;
+
     unless (param('passcode')) {
 
       print header(), start_html($title), h3($title);
       print start_form, "Passcode: ",
-        textfield(-name=>'passcode',  -size=>20, -maxlength=>20), br;
+        password_field(-name=>'passcode',  -size=>20, -maxlength=>20), br;
       print end_html();
       return;
     }
 
     my $passcode = param('passcode');
-    unless ($passcode eq "REDACTED_CREDENTIAL") {
+    unless ($passcode eq $adminpassword) {
       print header(), start_html($title), h3($title);
       print "Invalid passcode";
       print end_html();
       return;
     }
 
-    load_courses("$config_dir/courses.txt");
+    load_courses("$config_dir/courses.txt", 0);
     load_students("$config_dir/students.txt");
 
     my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,

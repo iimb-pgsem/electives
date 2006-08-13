@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: feedback.cgi,v 1.1 2006/02/12 10:51:34 a14562 Exp $
+# $Id: feedback.cgi,v 1.2 2006/08/13 14:37:05 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -17,7 +17,7 @@ use FindBin;
 use DBI;
 use POSIX qw(strftime);
 
-my $title = "PGSEM 2005-06 Q4 Electives Submission - Feedback";
+my $title = "PGSEM Electives Submission - Feedback";
 
 my %states = (
               'default' => \&print_feedback_form,

@@ -8,14 +8,15 @@ use FindBin;
 use DBI;
 use POSIX;
 
-# === begin configurable information ===
-my $config_dir = "$FindBin::Bin"; # at least for the present
-my $title = "PGSEM 2005-06 Quarter 4 (February - April 2006) Electives Submission";
-# === end configurable information
+use ElecConfig;
 
+my $config_dir = "$FindBin::Bin";
 
 sub main()
 {
+    read_config_info("$config_dir/config.txt");
+    assign_config_info;
+
     unless (param('passcode')) {
 
       print header(), start_html($title), h3($title);
@@ -26,7 +27,7 @@ sub main()
     }
 
     my $passcode = param('passcode');
-    unless ($passcode eq "REDACTED_CREDENTIAL") {
+    unless ($passcode eq $adminpassword) {
       print header(), start_html($title), h3($title);
       print "Invalid passcode";
       print end_html();
