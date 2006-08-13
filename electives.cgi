@@ -1,6 +1,6 @@
-#! perl -w
+#!perl -w
 
-# $Id: electives.cgi,v 1.22 2006/08/13 10:51:27 a14562 Exp $
+# $Id: electives.cgi,v 1.23 2006/08/13 11:53:29 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -18,7 +18,6 @@ use DBI;
 use POSIX qw(strftime);
 
 use ElecConfig;
-use ElecUtils;
 use Elec;
 
 my $config_dir = "$FindBin::Bin"; # at least for the present
@@ -571,7 +570,6 @@ sub is_authcode_ok($$)
 sub print_electives_page ()
 {
     print header(), start_html($title), h3($title);
-    
     if (!defined(param('rollno')) ||
         !defined(param('authcode'))) {
     
@@ -604,14 +602,12 @@ sub print_electives_page ()
           return;
     }
 
+
     my $errors = load_students("$config_dir/students.txt");
 
     my $site = $students{$rollno}{'site'};
 
     my %courses_for_student;
-
-    print "Here";
-    return;
 
     foreach my $course (keys %courses) {
       my $course_sites = $courses{$course}{"site"};
@@ -619,7 +615,7 @@ sub print_electives_page ()
       if (index($course_sites, $site) >= 0) {
           $student_can_take_course = 1;
       }
-      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+      if (index($courses{$course}{'barred'}, year_from_rollno($rollno)) >= 0) {
           $student_can_take_course = 0;
       }
       if ($student_can_take_course) {
@@ -688,7 +684,7 @@ sub print_electives_page ()
         $student_can_take_course = 1;
       }
      
-      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+      if (index($courses{$course}{'barred'}, year_from_rollno($rollno)) >= 0) {
           $student_can_take_course = 0;
       }
 
@@ -702,7 +698,7 @@ sub print_electives_page ()
       print "<td>$courses{$course}{'instructor'}</td>";
       print "<td>", $courses{$course}{'cap'}||"No cap", "</td>";
       print "<td>", $sites_displayed, "</td>";
-      print "<td>", $courses{$course}{'rbatches'}, "</td>";
+      print "<td>", $courses{$course}{'barred'}, "</td>";
       print "<td>", $student_can_take_course ? "Yes" : "No", "</td>";
    
       my $menuitem = "$course:" . 
@@ -810,7 +806,7 @@ sub available_courses_for_student ($)
     if (index($course_sites, $site) >= 0) {
         $student_can_take_course = 1;
     }
-    if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+    if (index($courses{$course}{'barred'}, year_from_rollno($rollno)) >= 0) {
         $student_can_take_course = 0;
     }
     if ($student_can_take_course) {
@@ -854,7 +850,7 @@ sub menulist_from_courselist
       $student_can_take_course = 1;
     }
    
-    if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+    if (index($courses{$course}{'barred'}, year_from_rollno($rollno)) >= 0) {
         $student_can_take_course = 0;
     }
   
@@ -1250,7 +1246,7 @@ sub print_p2ack_page ()
       if (index($course_sites, $site) >= 0) {
           $student_can_take_course = 1;
       }
-      if (index($courses{$course}{'rbatches'}, year_from_rollno($rollno)) >= 0) {
+      if (index($courses{$course}{'barred'}, year_from_rollno($rollno)) >= 0) {
           $student_can_take_course = 0;
       }
       if ($student_can_take_course) {
@@ -1519,7 +1515,7 @@ sub print_p3ack_page ()
 
 sub main()
 {
-    read_config_info("config.txt");
+    read_config_info("$config_dir/config.txt");
     assign_config_info;
 
     if (time > $deadline) {
