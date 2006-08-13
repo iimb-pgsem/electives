@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.2 2006/08/13 10:51:26 a14562 Exp $
+# $Id: Elec.pm,v 1.3 2006/08/13 11:38:22 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -104,11 +104,13 @@ sub year_from_rollno($)
     my $rollno = shift;
 
     my $year = substr($rollno, 0, 4);
-    if ($rollno == 2004165) {
 
+    if ($rollno == 2004165) {
+      # TODO: find a better way to handle this
       # Special exception
       $year = 2005;
     }
+
     $year =~ s/2021/2000/;
     $year =~ s/2104/2001/;
     $year =~ s/2204/2002/;
@@ -260,6 +262,7 @@ sub load_students($)
     while (<IN>) {
         chomp;
         next if skip_line($_);
+
         my ($rollno, $name, $email, $cgpa, $credits, $site) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
@@ -300,8 +303,8 @@ sub load_students($)
         $students{$rollno}{"credits"} = $credits;
         $students{$rollno}{"seniority"} = seniority_from_rollno($rollno);
         $students{$rollno}{"site"} = $site;
-
     }
+
     close IN;
     return $errors;
 }
