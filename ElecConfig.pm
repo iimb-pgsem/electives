@@ -1,5 +1,5 @@
 
-# $Id: ElecConfig.pm,v 1.3 2006/08/13 11:52:09 a14562 Exp $
+# $Id: ElecConfig.pm,v 1.4 2006/08/13 13:57:04 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -139,8 +139,8 @@ sub read_config_info ($)
         chomp;
         next if (/^\s*$/);
         next if (/^\s*\#/);
-        my ($key, $value) = split(/\s*=\s*/);
-        $config_info{$key} = $value;
+        my ($key, @value_tokens) = split(/\s*=\s*/);
+        $config_info{$key} = join("=", @value_tokens);
     }
     close IN;
 }
