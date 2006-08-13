@@ -1,5 +1,5 @@
 
-# $Id: ElecConfig.pm,v 1.2 2006/08/13 10:51:26 a14562 Exp $
+# $Id: ElecConfig.pm,v 1.3 2006/08/13 11:52:09 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -19,7 +19,26 @@ require Exporter;
 # Do not simply export all your public functions/methods/constants.
 
 @EXPORT = qw(
+    %config_info
+
     $phase
+
+    $adminpassword
+    $login
+    $password
+    $datasource
+    $dblogin
+    $dbpassword
+
+    $quarter_str
+    $quarter_starts_str
+
+    $send_email
+    $pop_required
+    $deadline
+    $deadline_str
+
+    $moodle_url
 
     $title
     $footer
