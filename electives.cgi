@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.24 2006/08/13 13:56:06 a14562 Exp $
+# $Id: electives.cgi,v 1.25 2006/08/16 10:41:53 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -211,14 +211,14 @@ this passcode and pressing the "Login" button. You will be sent to the
 elective choice page.</li><br>
 EOF
 
-    if ($phase == 2) {
+    if ($phase == 1) || ($phase == 2)) {
         print <<'EOF';
         <li>Choose: In the elective choice page,
 select the number of elective courses you wish to do, then give your choices as
 per the priority (first elective course is highest priority) and submit the
 choices you want to take. This will acknowledge the choices you
 selected by listing them and will also send you a mail about the
-elective courses you chose. 
+elective courses you chose. In Phase 1 you can give a maximum of 3 choices only. 
 EOF
     } elsif ($phase == 3) {
         print <<'EOF';
