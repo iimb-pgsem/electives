@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.25 2006/08/16 10:41:53 a14562 Exp $
+# $Id: electives.cgi,v 1.26 2006/08/18 15:25:26 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -211,7 +211,7 @@ this passcode and pressing the "Login" button. You will be sent to the
 elective choice page.</li><br>
 EOF
 
-    if ($phase == 1) || ($phase == 2)) {
+    if (($phase == 1) || ($phase == 2)) {
         print <<'EOF';
         <li>Choose: In the elective choice page,
 select the number of elective courses you wish to do, then give your choices as
@@ -672,7 +672,7 @@ sub print_electives_page ()
       my $sites = $courses{$course}{"site"};
       my $sites_displayed = '';
       if ($courses{$course}{"distributed"}) {
-          $sites_displayed = "Distributed";
+          $sites_displayed = ($phase == 1 ? "Potentially " : "") . "Distributed";
       } elsif ($sites eq 'B') {
         $sites_displayed = 'Bangalore';
       } elsif ($sites eq 'C') {
@@ -839,7 +839,7 @@ sub menulist_from_courselist
     my $sites = $courses{$course}{"site"};
     my $sites_displayed = '';
     if ($courses{$course}{"distributed"}) {
-        $sites_displayed = "Distributed";
+        $sites_displayed = ($phase == 1 ? "Potentially " : "") . "Distributed";
     } elsif ($sites eq 'B') {
       $sites_displayed = 'Bangalore';
     } elsif ($sites eq 'C') {
