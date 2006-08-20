@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.26 2006/08/18 15:25:26 a14562 Exp $
+# $Id: electives.cgi,v 1.27 2006/08/20 10:46:50 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -1300,10 +1300,13 @@ sub print_p2ack_page ()
     }
 
     if ($ncourses > @choices) {
+        unless (($phase == 1) && ($ncourses == 4) && (@choices == 3)) {
+             
         print br, "Error: number of courses ($ncourses) is greater than ",
             "the number of preferences (", scalar(@choices), ") given.";
         print br, local_end_html();
         return;
+        }
     }
 
     my $rv = update_db_with_preferences($rollno, $ncourses, join(',', @choices));
@@ -1558,6 +1561,7 @@ sub main()
     }
 }
 
+$ENV{'TZ'} = 'IST-5:30';
 main;
 
 # end of file
