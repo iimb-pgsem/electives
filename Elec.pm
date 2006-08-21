@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.4 2006/08/13 11:51:17 a14562 Exp $
+# $Id: Elec.pm,v 1.5 2006/08/21 07:20:43 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -386,7 +386,8 @@ sub load_choices($)
             $student_courses{$course} = 1;
         }
 
-        if ($ncourses > (keys %student_courses)) {
+        if ($ncourses > (keys %student_courses)
+	   && (($phase != 1) || ($ncourses != 4) || ((keys %student_courses) != 3))) {
             err_print("error:$file:$.: #choices < #courses");
             next LINE;
         }
