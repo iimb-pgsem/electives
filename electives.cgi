@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.27 2006/08/20 10:46:50 a14562 Exp $
+# $Id: electives.cgi,v 1.28 2006/08/21 05:34:16 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -1531,9 +1531,6 @@ sub main()
     if (time > $deadline) {
       print header(), start_html($title), h3($title);
 
-      foreach my $key (sort keys %config_info) {
-        print "$key => $config_info{$key}<br>\n";
-      }
       print "Phase " . $phase . " submission deadline is over.",  br;
       print "Please contact the PGSEM office for further assistance.", br;
       print br;
