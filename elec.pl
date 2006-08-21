@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.18 2006/08/13 10:51:26 a14562 Exp $
+# $Id: elec.pl,v 1.19 2006/08/21 07:19:09 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -66,6 +66,7 @@
 use strict;
 
 use Spreadsheet::WriteExcel;
+use ElecUtils;
 use ElecConfig;
 use Elec;
 
