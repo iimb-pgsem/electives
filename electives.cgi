@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.30 2006/08/23 12:32:10 a14562 Exp $
+# $Id: electives.cgi,v 1.31 2006/08/23 13:59:41 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -559,10 +559,14 @@ sub get_preferences_from_db($$)
 
     $sth->bind_columns(\$priority, \$ncourses, \$course, \$project);
     while ($sth->fetch()) {
-      $#{$rec->{"courses"}} = $priority-1;
-      ${$rec->{"courses"}}[$priority-1] = $course;
-      $rec->{"ncourses"} = $ncourses;
-      $rec->{"project"} = ($project ? "Yes" : "No");
+      if ($course ne "PROJECT") {
+        $#{$rec->{"courses"}} = $priority-1;
+        ${$rec->{"courses"}}[$priority-1] = $course;
+        $rec->{"ncourses"} = $ncourses;
+        $rec->{"project"} = ($project ? "Yes" : "No"); # to be deprecated
+      } else {
+        $rec->{"project"} = "Yes";
+      }
     }
     
     $sth->finish();
@@ -753,7 +757,9 @@ sub print_electives_page ()
    my $rec = \%rec;
    my $rv = get_preferences_from_db($rollno, $rec);
 
-   my $history = ($rv == 0) && defined($rec->{'ncourses'}) && ($rec->{'ncourses'} > 0);
+   my $history = ($rv == 0) && 
+                 ((defined($rec->{'ncourses'}) && ($rec->{'ncourses'} > 0)) ||
+                 ((defined($rec->{'project'}) && ($rec->{'project'} eq "Yes"))));
 
    if ($history) {
      print "<font color='blue'>";
@@ -1198,6 +1204,10 @@ sub update_db_with_preferences ($$$$)
       for (my $i = 0; $i < @codes; ++$i) { 
         my $project_code = (($project eq "Yes") ? 1 : 0);
         $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1', '$project_code');");
+        die "INSERT failed" unless $status;
+      }
+      if ($project eq "Yes") {
+        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', 0, $ncourses, 'PROJECT', '1', '1');");
         die "INSERT failed" unless $status;
       }
       # $dbh->commit();
