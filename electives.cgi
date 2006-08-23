@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.29 2006/08/23 09:11:45 a14562 Exp $
+# $Id: electives.cgi,v 1.30 2006/08/23 12:32:10 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -562,7 +562,7 @@ sub get_preferences_from_db($$)
       $#{$rec->{"courses"}} = $priority-1;
       ${$rec->{"courses"}}[$priority-1] = $course;
       $rec->{"ncourses"} = $ncourses;
-      $rec->{"project"} = $project;
+      $rec->{"project"} = ($project ? "Yes" : "No");
     }
     
     $sth->finish();
@@ -1196,7 +1196,8 @@ sub update_db_with_preferences ($$$$)
 
       my @codes = split(',', $courselist);
       for (my $i = 0; $i < @codes; ++$i) { 
-        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1', '$project');");
+        my $project_code = (($project eq "Yes") ? 1 : 0);
+        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1', '$project_code');");
         die "INSERT failed" unless $status;
       }
       # $dbh->commit();
