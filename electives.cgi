@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.28 2006/08/21 05:34:16 a14562 Exp $
+# $Id: electives.cgi,v 1.29 2006/08/23 09:11:45 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -204,7 +204,7 @@ A passcode is valid only for a single quarter.
 You need to get a new passcode for Phase 1.
 However, once a passcode is generated in Phase 1,
 you can continue to use it for Phases 2 and 3.
-Even if you forget your passcode, you can fetch it later.</li>
+Even if you forget your passcode, you can fetch it later.</li><br>
 
 <li>Login: You can now login by entering <b>both</b> your roll number <b>and</b>
 this passcode and pressing the "Login" button. You will be sent to the
@@ -231,6 +231,20 @@ EOF
     print <<'EOF';
  </li><br></ol> </div>
 EOF
+
+
+    if ($phase == 2) {
+        print "<br><b>Note for Phase 2</b>:<br>\n";
+        print "<ol>";
+        print "<li>The current phase (Phase 2A) is meant for seniors. If you belong to the 2005 batch, ";
+        print "the site will not prevent you from submitting your choices. But they will be considered ";
+        print "only in Phase 2B.</li><br";
+        print "<li>If you have not submitted Phase 1 choices, you can submit your choices in Phase 2. ";
+        print "But your choices will be considered during allocation ";
+        print "only after all others' choices are acted on.</li><br>";
+        print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
+        print "</ol>"
+    }
 
     print
         start_form(),
@@ -531,7 +545,7 @@ sub get_preferences_from_db($$)
     
     my $status;
     my $sth;
-    $sth = $dbh->prepare("SELECT priority, ncourses, course FROM choices WHERE rollno = '$rollno'");
+    $sth = $dbh->prepare("SELECT priority, ncourses, course, project FROM choices WHERE rollno = '$rollno'");
     $status = $sth->execute();
     
     unless ($status) {
@@ -541,13 +555,14 @@ sub get_preferences_from_db($$)
       return -1;
     }
     
-    my ($priority, $ncourses, $course);
+    my ($priority, $ncourses, $course, $project);
 
-    $sth->bind_columns(\$priority, \$ncourses, \$course);
+    $sth->bind_columns(\$priority, \$ncourses, \$course, \$project);
     while ($sth->fetch()) {
       $#{$rec->{"courses"}} = $priority-1;
       ${$rec->{"courses"}}[$priority-1] = $course;
       $rec->{"ncourses"} = $ncourses;
+      $rec->{"project"} = $project;
     }
     
     $sth->finish();
@@ -720,6 +735,19 @@ sub print_electives_page ()
     print br;
 
 
+    if ($phase == 2) {
+        print "<br><b>Note for Phase 2</b>:<br>\n";
+        print "<ol>";
+        print "<li>The current phase (Phase 2A) is meant for seniors. If you belong to the 2005 batch, ";
+        print "the site will not prevent you from submitting your choices. But they will be considered ";
+        print "only in Phase 2B.</li><br";
+        print "<li>If you have not submitted Phase 1 choices, you can submit your choices in Phase 2. ";
+        print "But your choices will be considered during allocation ";
+        print "only after all others' choices are acted on.</li><br>";
+        print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
+        print "</ol>"
+    }
+
 
    my %rec;
    my $rec = \%rec;
@@ -738,6 +766,12 @@ sub print_electives_page ()
           popup_menu(-name=>'ncourses', 
                      -values=>['-', '0', '1', '2', '3', '4'],
                      -default=>($history ? $rec->{"ncourses"} : '-')), br, br;
+   
+   print
+        br, "Planning to take a project course?", "<blink>*</blink>", 
+          popup_menu(-name=>'project', 
+                     -values=>['-', 'No', 'Yes'],
+                     -default=>($history ? $rec->{"project"} : '-')), br, br;
    
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
@@ -1141,9 +1175,9 @@ sub get_changes_from_db($$)
     return 0; 
 }
 
-sub update_db_with_preferences ($$$)
+sub update_db_with_preferences ($$$$)
 {
-    my ($rollno, $ncourses, $courselist) = @_;
+    my ($rollno, $ncourses, $courselist, $project) = @_;
 
     my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
         {AutoCommit => 1, RaiseError => 1} );
@@ -1162,7 +1196,7 @@ sub update_db_with_preferences ($$$)
 
       my @codes = split(',', $courselist);
       for (my $i = 0; $i < @codes; ++$i) { 
-        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1');");
+        $status = $dbh->do("INSERT INTO choices VALUES ('$rollno', $i+1, $ncourses, '$codes[$i]', '1', '$project');");
         die "INSERT failed" unless $status;
       }
       # $dbh->commit();
@@ -1186,7 +1220,8 @@ sub print_p2ack_page ()
    
     if (!defined(param('rollno')) ||
         !defined(param('authcode')) ||
-        !defined(param('ncourses'))) {
+        !defined(param('ncourses')) ||
+        !defined(param('project'))) {
     
       print "Invalid input: please try again", local_end_html();
       return;
@@ -1195,6 +1230,7 @@ sub print_p2ack_page ()
     my $rollno = param('rollno');
     my $authcode = param('authcode');
     my $ncourses = param('ncourses');
+    my $project = param('project');
    
     my $errors = load_students("$config_dir/students.txt");
 
@@ -1228,6 +1264,12 @@ sub print_p2ack_page ()
     unless ($ncourses =~ /[01234]/) {
         print "Error: invalid number of courses", br, local_end_html();
         log_db("FAIL: preferences: invalid number of courses: rollno=$rollno");
+        return;
+    }
+
+    unless ($project =~ /Yes|No/) {
+        print "Error: invalid option for project course", br, local_end_html();
+        log_db("FAIL: preferences: invalid option for project course: rollno=$rollno");
         return;
     }
 
@@ -1309,10 +1351,11 @@ sub print_p2ack_page ()
         }
     }
 
-    my $rv = update_db_with_preferences($rollno, $ncourses, join(',', @choices));
+    my $rv = update_db_with_preferences($rollno, $ncourses, join(',', @choices), $project);
     return if ($rv != 0);
 
-    log_db("OK: preferences: rollno=$rollno, ncourses=$ncourses, courselist=" . join(':', @choices));
+    log_db("OK: preferences: rollno=$rollno, ncourses=$ncourses, " .
+        "courselist=" . join(':', @choices) . ", project=$project");
 
     my %rec;
     my $rec = \%rec;
@@ -1327,8 +1370,9 @@ sub print_p2ack_page ()
     $body .= "Roll Number: $rollno\n";
     $body .= "Name: $students{$rollno}{'name'}\n";
     $body .= "Site: $displayed_site\n\n";
-    $body .= "Number of courses: " . ($rec->{'ncourses'} || "0") . "\n\n";
-    $body .= "Course preferences:\n";
+    $body .= "Number of elective courses: " . ($rec->{'ncourses'} || "0") . "\n\n";
+    $body .= "Whether doing project course: " . ($rec->{'project'} || "No") . "\n\n";
+    $body .= "Elective course preferences:\n";
     my $index = 1;
     foreach my $course (@{$rec->{'courses'}}) {
         $body .= "Preference $index: $course: $courses{$course}{'name'}\n"; 
@@ -1345,7 +1389,8 @@ sub print_p2ack_page ()
     print "You may also want to print this page for future reference.", br, br;
 
     print "<i>Roll Number: </i><b>$rollno</b>", br, br;
-    print "<i>Number of courses: </i><b>$ncourses</b>", br, br;
+    print "<i>Number of elective courses: </i><b>$ncourses</b>", br, br;
+    print "<i>Whether doing project course: </i><b>$project</b>", br, br;
     print "<i>Course preferences:</i>", br;
 
     $index = 1;
