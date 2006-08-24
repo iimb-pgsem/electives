@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: summarytext.cgi,v 1.5 2006/08/13 14:37:05 a14562 Exp $
+# $Id: summarytext.cgi,v 1.6 2006/08/24 17:48:14 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -81,9 +81,11 @@ sub main()
     my %choices;
 
     while ($sth->fetch()) {
-      $choices{$rollno}{"ncourses"} = $ncourses;
-      $choices{$rollno}{"priority"}{$priority} = $course;
-      $choices{$rollno}{"courses"}{$course} = $priority;
+      if ($course ne "PROJECT") {
+        $choices{$rollno}{"ncourses"} = $ncourses;
+        $choices{$rollno}{"priority"}{$priority} = $course;
+        $choices{$rollno}{"courses"}{$course} = $priority;
+      }
     }
   
     $sth->finish();
