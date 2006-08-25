@@ -1,5 +1,5 @@
 
-# $Id: ElecConfig.pm,v 1.4 2006/08/13 13:57:04 a14562 Exp $
+# $Id: ElecConfig.pm,v 1.5 2006/08/25 14:18:07 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -100,7 +100,7 @@ our $quarter_starts_str; # text field for printing
 our $send_email;
 our $pop_required;
 our $deadline;
-our $deadline_str; # derived from deadline
+our $deadline_str; 
 
 our $moodle_url;
 
@@ -163,7 +163,7 @@ sub assign_config_info
     my $d = $config_info{'deadline'};
     my ($year, $month, $day) = split(/-/, $d);
     $deadline = POSIX::mktime(0, 0, 0, $day, $month - 1, $year - 1900);
-    $deadline_str = POSIX::strftime('00:00 hours %d %b, %Y', 0, 0, 0, $day, $month - 1, $year - 1900);
+    $deadline_str = $config_info{'deadline_str'};
 
     $moodle_url = $config_info{'moodle_url'};
 
