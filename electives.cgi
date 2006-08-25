@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.31 2006/08/23 13:59:41 a14562 Exp $
+# $Id: electives.cgi,v 1.32 2006/08/25 14:17:41 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -19,6 +19,7 @@ use POSIX qw(strftime);
 
 use ElecConfig;
 use Elec;
+use ElecUtils;
 
 my $config_dir = "$FindBin::Bin"; # at least for the present
 
@@ -235,13 +236,9 @@ EOF
 
     if ($phase == 2) {
         print "<br><b>Note for Phase 2</b>:<br>\n";
-        print "<ol>";
-        print "<li>The current phase (Phase 2A) is meant for seniors. If you belong to the 2005 batch, ";
-        print "the site will not prevent you from submitting your choices. But they will be considered ";
-        print "only in Phase 2B.</li><br";
-        print "<li>If you have not submitted Phase 1 choices, you can submit your choices in Phase 2. ";
-        print "But your choices will be considered during allocation ";
-        print "only after all others' choices are acted on.</li><br>";
+        print "<ol>\n";
+        print "<li>The current phase (Phase 2B) is meant for juniors and those who missed Phase 1 or 2A.\n";
+        print "If you have been allotted courses based on Phase 2A, you can't access Phase 2B.</li>\n";
         print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
         print "</ol>"
     }
@@ -589,6 +586,20 @@ sub is_authcode_ok($$)
     return ($rv == $authcode);
 }
 
+my %p2a_students;
+
+sub load_p2a_students($) 
+{
+    my $file = shift;
+    open IN, "<$file" or die "Can't load $file: $!\n";
+    while (<IN>) {
+        chomp;
+        next if skip_line($_);
+        $p2a_students{$_} = 1;
+    }
+    close IN;
+}
+
 sub print_electives_page ()
 {
     print header(), start_html($title), h3($title);
@@ -626,6 +637,16 @@ sub print_electives_page ()
 
 
     my $errors = load_students("$config_dir/students.txt");
+    
+    load_p2a_students("$config_dir/p2a-students.txt");
+
+    if (defined($p2a_students{$rollno})) {
+
+        print "You have been allotted courses based on Phase 2A.<br>\n";
+        print "Hence you cannot participate in the current phase (Phase 2B).<br>\n";
+        print local_end_html();
+        return;
+    }
 
     my $site = $students{$rollno}{'site'};
 
@@ -741,17 +762,12 @@ sub print_electives_page ()
 
     if ($phase == 2) {
         print "<br><b>Note for Phase 2</b>:<br>\n";
-        print "<ol>";
-        print "<li>The current phase (Phase 2A) is meant for seniors. If you belong to the 2005 batch, ";
-        print "the site will not prevent you from submitting your choices. But they will be considered ";
-        print "only in Phase 2B.</li><br";
-        print "<li>If you have not submitted Phase 1 choices, you can submit your choices in Phase 2. ";
-        print "But your choices will be considered during allocation ";
-        print "only after all others' choices are acted on.</li><br>";
+        print "<ol>\n";
+        print "<li>The current phase (Phase 2B) is meant for juniors and those who missed Phase 1 or 2A.\n";
+        print "If you have been allotted courses based on Phase 2A, you can't access Phase 2B.</li>\n";
         print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
         print "</ol>"
     }
-
 
    my %rec;
    my $rec = \%rec;
