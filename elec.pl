@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.19 2006/08/21 07:19:09 a14562 Exp $
+# $Id: elec.pl,v 1.20 2006/08/28 10:00:29 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -582,28 +582,60 @@ sub write_excel
     $capsint->write(0, 2, "Priority", $formatint);
     $capsint->write(0, 3, "CGPA", $formatint);
     $capsint->write(0, 4, "# rejected", $formatint);
+    $capsint->write(0, 5, "# enrolled", $formatint);
+    $capsint->write(0, 6, "# available", $formatint);
 
     $capsext->write(0, 0, "Course id", $formatint);
     $capsext->write(0, 1, "Year", $formatext);
     $capsext->write(0, 2, "Priority", $formatext);
     $capsext->write(0, 3, "CGPA", $formatext);
     $capsext->write(0, 4, "# rejected", $formatext);
+    $capsext->write(0, 5, "# enrolled", $formatext);
+    $capsext->write(0, 6, "# available", $formatext);
 
     {
       my $row = 1;
-      for my $c (sort keys %courses_capped) {
+      for my $c (sort keys %courses) {
 
-	$capsint->write($row, 0, $c, $formatint);
-	$capsint->write($row, 1, $courses_capped{$c}{"year"});
-	$capsint->write($row, 2, $courses_capped{$c}{"priority"});
-	$capsint->write($row, 3, $courses_capped{$c}{"cgpa"});
-	$capsint->write($row, 4, $courses_capped{$c}{"nrejected"});
+	if (defined($courses_capped{$c})) {
 
-	$capsext->write($row, 0, $c);
-	$capsext->write($row, 1, $courses_capped{$c}{"year"});
-	$capsext->write($row, 2, $courses_capped{$c}{"priority"});
-	$capsext->write($row, 3, $courses_capped{$c}{"cgpa"});
-	$capsext->write($row, 4, $courses_capped{$c}{"nrejected"});
+	  $capsint->write($row, 0, $c, $formatint);
+	  $capsint->write($row, 1, $courses_capped{$c}{"year"});
+	  $capsint->write($row, 2, $courses_capped{$c}{"priority"});
+	  $capsint->write($row, 3, $courses_capped{$c}{"cgpa"});
+	  $capsint->write($row, 4, $courses_capped{$c}{"nrejected"});
+	  $capsint->write($row, 5, $allocation{$c}{"nallotted"});
+	  $capsint->write($row, 6, 0);
+
+	  $capsext->write($row, 0, $c);
+	  $capsext->write($row, 1, $courses_capped{$c}{"year"});
+	  $capsext->write($row, 2, $courses_capped{$c}{"priority"});
+	  $capsext->write($row, 3, $courses_capped{$c}{"cgpa"});
+	  $capsext->write($row, 4, $courses_capped{$c}{"nrejected"});
+	  $capsext->write($row, 5, $allocation{$c}{"nallotted"});
+	  $capsext->write($row, 6, 0);
+	}
+	else {
+	  $capsint->write($row, 0, $c, $formatint);
+	  $capsint->write($row, 1, "-");
+	  $capsint->write($row, 2, "-");
+	  $capsint->write($row, 3, "-");
+	  $capsint->write($row, 4, "-");
+	  $capsint->write($row, 5, $allocation{$c}{"nallotted"} || 0);
+	  $capsint->write($row, 6, $courses{$c}{"nocap"}
+			  ?"NA"
+			  :($courses{$c}{"cap"} - $allocation{$c}{"nallotted"}));
+
+	  $capsext->write($row, 0, $c);
+	  $capsext->write($row, 1, "-");
+	  $capsext->write($row, 2, "-");
+	  $capsext->write($row, 3, "-");
+	  $capsext->write($row, 4, "-");
+	  $capsext->write($row, 5, $allocation{$c}{"nallotted"} || 0);
+	  $capsext->write($row, 6, $courses{$c}{"nocap"}
+			  ?"NA"
+			  :($courses{$c}{"cap"} - $allocation{$c}{"nallotted"}));
+	}
 	++$row;
       }
     }
@@ -1212,15 +1244,19 @@ sub main
 
     print_courses;
 
-    if ($phase == 2) {
+    if ($phase =~ /2/) {
 
       load_p1_students("choices-p1.txt");
+    }
+    if ($phase =~ /2B/) {
+
+      load_p2a_students("p2a-students.txt");
     }
     load_students("students.txt");
     load_project_students("project-students.txt");
     print_students;
 
-    if ($phase == 1 || $phase == 2) {
+    if ($phase =~ /1/ || $phase =~ /2/) {
 
       load_choices("choices.txt");
       print_choices;

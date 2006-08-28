@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.5 2006/08/21 07:20:43 a14562 Exp $
+# $Id: Elec.pm,v 1.6 2006/08/28 10:00:29 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -27,6 +27,7 @@ require Exporter;
     %students
     %project_students
     %p1_students
+    %p2a_students
     %choices
     %p3choices
 
@@ -38,6 +39,7 @@ require Exporter;
     print_students
     load_project_students
     load_p1_students
+    load_p2a_students
     load_choices
     print_choices
 );
@@ -78,6 +80,10 @@ our %project_students;
 
 our %p1_students;
 # p1 students hash (read from choices-p1.txt; used only in Phase 2):
+# TODO: document
+
+our %p2a_students;
+# p2a students hash (read from p2a-students.txt; used only in Phase 2B):
 # TODO: document
 
 our %choices;
@@ -123,12 +129,25 @@ sub seniority_from_rollno($)
     my ($rollno) = shift;
     
     my $year = year_from_rollno($rollno);
+
     my $credits = $students{$rollno}{"credits"};
-    if ($credits < $credits_pass && ($phase != 2 || defined($p1_students{$rollno}))) {
-        return $year;
-    } else {
-        return $current_year;
+    if ($credits >= $credits_pass) {
+
+      #print "$rollno: seniority lost due to credit completion\n";
+      return $current_year;
     }
+    if ($phase =~ /2/ && !defined($p1_students{$rollno})) {
+
+      #print "$rollno: seniority lost due to missing phase 1\n";
+      return $current_year;
+    }
+    if ($phase =~ /2B/ && $year != $current_year - 1
+	&& !defined($p2a_students{$rollno})) {
+
+      #print "$rollno: seniority lost due to missing phase 2A\n";
+      return $current_year;
+    }
+    return $year;
 }
 
 # load roll numbers of students who registered in phase 1
@@ -144,6 +163,24 @@ sub load_p1_students ($)
        s/^\s*//g;
        s/\s*$//g;
        $p1_students{$_} = 1;
+    }
+
+    close IN;
+}
+
+# load roll numbers of students who registered in phase 1
+sub load_p2a_students ($)
+{
+    my $filename = shift;
+
+    open IN, "<$filename" or die "Can't open $filename: $!";
+
+    while (<IN>) {
+       chomp;
+       s/;.*//;
+       s/^\s*//g;
+       s/\s*$//g;
+       $p2a_students{$_} = 1;
     }
 
     close IN;
@@ -213,6 +250,7 @@ sub load_courses($$)
 
         $name ||= "";
         $instructor ||= "";
+	my $nocap = !defined($cap);
         $cap ||= $default_cap;
         $mincap ||= $default_mincap;
         $status ||= $default_status;
@@ -234,6 +272,7 @@ sub load_courses($$)
         $courses{$code}{"distributed"} = (@sites_list > 1 ? 1: 0);
         $courses{$code}{"status"} = $status;
         $courses{$code}{"mincap"} = $mincap;
+        $courses{$code}{"nocap"} = $nocap;
 
     }
     close IN;
@@ -353,6 +392,13 @@ sub load_choices($)
             next;
         } 
 
+	if ($phase eq "2A" &&
+	    ($students{$rollno}->{"seniority"} == $current_year
+	     || $students{$rollno}->{"seniority"} == $current_year - 1)) {
+            err_print("error:$file:$.: roll number '$rollno' is junior submitting in 2A");
+            next;
+	}
+
         if (!defined($ncourses)) {
             err_print("error:$file:$.: number of courses not defined");
             next;
@@ -387,7 +433,7 @@ sub load_choices($)
         }
 
         if ($ncourses > (keys %student_courses)
-	   && (($phase != 1) || ($ncourses != 4) || ((keys %student_courses) != 3))) {
+	   && (($phase !~ /1/) || ($ncourses != 4) || ((keys %student_courses) != 3))) {
             err_print("error:$file:$.: #choices < #courses");
             next LINE;
         }
