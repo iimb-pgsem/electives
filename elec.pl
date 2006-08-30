@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.21 2006/08/30 17:42:59 a14562 Exp $
+# $Id: elec.pl,v 1.22 2006/08/30 17:49:38 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -939,7 +939,10 @@ sub write_allocation_by_student ($)
         print OUT "$students{$rollno}{'name'}; ";
         print OUT "$students{$rollno}{'email'}; ";
         print OUT "$choices{$rollno}{'ncourses'}; ";
+        print OUT "$students{$rollno}{'nallowed'}; ";
         print OUT "$choices{$rollno}{'nallotted'}; ";
+        print OUT "$students{$rollno}{'seniority'}; ";
+        print OUT ($students{$rollno}{'senreason'} || "") . "; ";
 
         foreach my $course (@{$choices{$rollno}{"courselist"}}) {
             print OUT "$course=", 
