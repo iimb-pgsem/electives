@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.20 2006/08/28 10:00:29 a14562 Exp $
+# $Id: elec.pl,v 1.21 2006/08/30 17:42:59 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -247,17 +247,7 @@ sub allocate_course($$$)
         return 0;
     }
 
-    my $allowed = $max_courses - 
-        (defined($project_students{$rec->{'rollno'}}) ? 1 : 0);
-
-
-    if (($choices{$rollno}{"nallotted"} == $allowed - 1) &&
-        ($students{$rollno}{'cgpa'} < $min_cgpa_four_courses)) {
-
-        $rec->{"allotted"} = 0;
-        $rec->{"reason"} = "Allowed:" . ($allowed-1);
-        return 0;
-    }
+    my $allowed = $students{$rollno}{"nallowed"};
 
     if (($choices{$rollno}{"nallotted"} == $allowed) &&
         ($allowed < $max_courses)) {
@@ -305,7 +295,7 @@ sub allocate_course($$$)
     if ($allocation{$course}{"nallotted"} == $courses{$course}{"cap"}) {
 
       # Course is capped
-      $courses_capped{$course}{"year"} = seniority_from_rollno($rollno);
+      $courses_capped{$course}{"year"} = $students{$rollno}{"seniority"};
       $courses_capped{$course}{"priority"} = $priority;
       $courses_capped{$course}{"cgpa"} = $students{$rollno}{"cgpa"};
     }
@@ -316,7 +306,7 @@ sub allocate_in_round($$)
 {
     my ($round, $rec) = @_;
 
-    my $seniority = seniority_from_rollno($rec->{"rollno"});
+    my $seniority = $students{$rec->{"rollno"}}{"seniority"};
     return ($round == $seniority);
 }
 
@@ -361,7 +351,7 @@ sub allocate_courses
 
     # TODO: derive years automatically 
 
-    for (my $year = 2002; $year <= $current_year; ++$year) {
+    for (my $year = 2002; $year <= $current_year + 1; ++$year) {
       do_allocation($year);
     }
 
@@ -464,7 +454,7 @@ sub write_conflicts
 
     foreach my $i (sort keys %courses) {
 
-      print "Course $i is $count\n";
+      #print "Course $i is $count\n";
       $courseNum{$i} = $count;
       $conflictint->write($rowoffset, $count + 1, $i);
       $conflictint->write($rowoffset + $count + 1, 0, $i);
@@ -473,7 +463,7 @@ sub write_conflicts
   
     foreach my $rec (@conflictsall) {
 
-      print "Conflict: $rec->{'a'} ($courseNum{$rec->{'a'}}) - $rec->{'b'} ($courseNum{$rec->{'b'}}): $rec->{'n'}\n";
+      #print "Conflict: $rec->{'a'} ($courseNum{$rec->{'a'}}) - $rec->{'b'} ($courseNum{$rec->{'b'}}): $rec->{'n'}\n";
       if ($courseNum{$rec->{'a'}} >= $courseNum{$rec->{'b'}}) {
 
 	$conflictint->write($rowoffset + $courseNum{$rec->{'a'}} + 1,
@@ -578,7 +568,7 @@ sub write_excel
     $capsext->set_footer("&C$footer&A&R&P of &N");
 
     $capsint->write(0, 0, "Course id", $formatint);
-    $capsint->write(0, 1, "Year", $formatint);
+    $capsint->write(0, 1, "Seniority", $formatint);
     $capsint->write(0, 2, "Priority", $formatint);
     $capsint->write(0, 3, "CGPA", $formatint);
     $capsint->write(0, 4, "# rejected", $formatint);
@@ -586,7 +576,7 @@ sub write_excel
     $capsint->write(0, 6, "# available", $formatint);
 
     $capsext->write(0, 0, "Course id", $formatint);
-    $capsext->write(0, 1, "Year", $formatext);
+    $capsext->write(0, 1, "Seniority", $formatext);
     $capsext->write(0, 2, "Priority", $formatext);
     $capsext->write(0, 3, "CGPA", $formatext);
     $capsext->write(0, 4, "# rejected", $formatext);
@@ -597,21 +587,42 @@ sub write_excel
       my $row = 1;
       for my $c (sort keys %courses) {
 
-	if (defined($courses_capped{$c})) {
+        if ($courses{$c}{"status"} ne 'A') {
 
 	  $capsint->write($row, 0, $c, $formatint);
-	  $capsint->write($row, 1, $courses_capped{$c}{"year"});
+	  $capsint->write($row, 1, "---------- Course dropped ----------");
+
+	  $capsext->write($row, 0, $c);
+	  $capsext->write($row, 1, "---------- Course dropped ----------");
+	}
+	elsif (defined($courses_capped{$c})) {
+
+	  my $y = $courses_capped{$c}{"year"};
+	  my $yi = $y;
+	  my $ye = $y;
+	  if ($y == $current_year + 1) {
+
+	    $yi = "LATE";
+	    $ye = "None";
+	  }
+	  elsif ($y == $current_year) {
+
+	    $yi = "MISSED";
+	    $ye = "None";
+	  }
+	  $capsint->write($row, 0, $c, $formatint);
+	  $capsint->write($row, 1, $yi);
 	  $capsint->write($row, 2, $courses_capped{$c}{"priority"});
 	  $capsint->write($row, 3, $courses_capped{$c}{"cgpa"});
-	  $capsint->write($row, 4, $courses_capped{$c}{"nrejected"});
+	  $capsint->write($row, 4, $courses_capped{$c}{"nrejected"} || 0);
 	  $capsint->write($row, 5, $allocation{$c}{"nallotted"});
 	  $capsint->write($row, 6, 0);
 
 	  $capsext->write($row, 0, $c);
-	  $capsext->write($row, 1, $courses_capped{$c}{"year"});
+	  $capsext->write($row, 1, $ye);
 	  $capsext->write($row, 2, $courses_capped{$c}{"priority"});
 	  $capsext->write($row, 3, $courses_capped{$c}{"cgpa"});
-	  $capsext->write($row, 4, $courses_capped{$c}{"nrejected"});
+	  $capsext->write($row, 4, $courses_capped{$c}{"nrejected"} || 0);
 	  $capsext->write($row, 5, $allocation{$c}{"nallotted"});
 	  $capsext->write($row, 6, 0);
 	}
@@ -639,6 +650,64 @@ sub write_excel
 	++$row;
       }
     }
+
+    {
+      my $col = 0;
+      my $row = 0;
+      my $statsint = $workbookint->add_worksheet("Stats");
+      $statsint->set_paper(9);
+      $statsint->set_landscape();
+      $statsint->fit_to_pages(1);
+      $statsint->set_header("&C$title: &A");
+      $statsint->set_footer("&C$footer&R&P of &N");
+
+      $statsint->write($row, $col++, "Seniority", $formatint);
+      $statsint->write($row, $col++, "Students", $formatint);
+      $statsint->write($row, $col++, "Demand", $formatint);
+      $statsint->write($row, $col++, "Allocation", $formatint);
+      ++$row;
+
+      my %stats;
+      foreach my $rollno (@ranklist) {
+
+	next unless $choices{$rollno};
+	my $demand = ($students{$rollno}{'nallowed'}
+		      < $choices{$rollno}{'ncourses'}
+		      ? $students{$rollno}{'nallowed'}
+		      : $choices{$rollno}{'ncourses'});
+	my $alloc = $choices{$rollno}{'nallotted'};
+	my $s = $students{$rollno}{'seniority'}; 
+	++$stats{$s}{'students'};
+	$stats{$s}{'demand'} += $demand;
+	$stats{$s}{'alloc'} += $alloc;
+	++$stats{'total'}{'students'};
+	$stats{'total'}{'demand'} += $demand;
+	$stats{'total'}{'alloc'} += $alloc;
+      }
+      
+      for my $s (sort keys (%stats)) {
+
+	my $label = $s;
+	if ($s ne "total") {
+
+	  if ($s == $current_year) {
+
+	    $label = "MISSED";
+	  }
+	  elsif ($s == $current_year + 1) {
+
+	    $label = "LATE";
+	  }
+	}
+	$col = 0;
+	$statsint->write($row, $col++, $label);
+	$statsint->write($row, $col++, $stats{$s}{'students'});
+	$statsint->write($row, $col++, $stats{$s}{'demand'});
+	$statsint->write($row, $col++, $stats{$s}{'alloc'});
+	++$row;
+      }
+    }
+
     my $coursecount = 0;
     my %studentrow;
 
@@ -802,6 +871,7 @@ sub write_choices_excel ($$$$)
     $sheet->write($row, $col++, "Name", $formatbold);
 
     $sheet->write($row, $col++, "Credits", $formatbold);
+    $sheet->write($row, $col++, "Seniority", $formatbold);
     $sheet->write($row, $col++, "CGPA", $formatbold);
     $sheet->write($row, $col++, "Asked", $formatbold);
     $sheet->write($row, $col++, "Allotted", $formatbold) if $show_results;
@@ -822,6 +892,7 @@ sub write_choices_excel ($$$$)
       $sheet->write($row, $col++, $rollno);
       $sheet->write($row, $col++, $students{$rollno}{'name'});
       $sheet->write($row, $col++, $students{$rollno}{'credits'});
+      $sheet->write($row, $col++, $students{$rollno}{'senreason'});
       $sheet->write($row, $col++, $students{$rollno}{'cgpa'});
       $sheet->write($row, $col++, $choices{$rollno}{'ncourses'});
       $sheet->write($row, $col++, $choices{$rollno}{'nallotted'}) if $show_results;
@@ -922,10 +993,10 @@ sub compute_conflicts
 
     @$conflicts = sort { $a->{"n"} <=> $b->{"n"} } @$conflicts;
 
-    print "=== Course conflicts ===\n";
-    foreach my $rec (@$conflicts) {
-        print "$rec->{'a'} - $rec->{'b'}: $rec->{'n'}\n";
-    } 
+  #print "=== Course conflicts ===\n";
+  #foreach my $rec (@$conflicts) {
+  #print "$rec->{'a'} - $rec->{'b'}: $rec->{'n'}\n";
+  #} 
 }
 
 sub load_allocations($)
@@ -1083,9 +1154,8 @@ sub load_p3choices($)
 
 	if ($trtype eq "A") {
 
-	  my $allowed = $max_courses - 
-	  (defined($project_students{$rollno}) ? 1 : 0) -
-	    (($students{$rollno}{'cgpa'} < $min_cgpa_four_courses) ? 1 : 0);
+	  my $allowed = $students{$rollno}{"nallowed"};
+
 	  my $allotted = (keys %{$p3salloc{$rollno}{"courses"}});
 	  if ($allotted >= $allowed) {
 
@@ -1251,9 +1321,10 @@ sub main
     if ($phase =~ /2B/) {
 
       load_p2a_students("p2a-students.txt");
+      load_p2_students("p2-students.txt");
     }
-    load_students("students.txt");
     load_project_students("project-students.txt");
+    load_students("students.txt");
     print_students;
 
     if ($phase =~ /1/ || $phase =~ /2/) {
