@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.7 2006/08/30 17:44:41 a14562 Exp $
+# $Id: Elec.pm,v 1.8 2006/08/30 17:50:06 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
