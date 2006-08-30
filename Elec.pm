@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.6 2006/08/28 10:00:29 a14562 Exp $
+# $Id: Elec.pm,v 1.7 2006/08/30 17:44:41 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -28,11 +28,11 @@ require Exporter;
     %project_students
     %p1_students
     %p2a_students
+    %p2_students
     %choices
     %p3choices
 
     year_from_rollno
-    seniority_from_rollno
     load_courses
     print_courses
     load_students
@@ -40,6 +40,7 @@ require Exporter;
     load_project_students
     load_p1_students
     load_p2a_students
+    load_p2_students
     load_choices
     print_choices
 );
@@ -84,6 +85,10 @@ our %p1_students;
 
 our %p2a_students;
 # p2a students hash (read from p2a-students.txt; used only in Phase 2B):
+# TODO: document
+
+our %p2_students;
+# p2a students hash (read from p2-students.txt; used only in Phase 2B):
 # TODO: document
 
 our %choices;
@@ -131,23 +136,28 @@ sub seniority_from_rollno($)
     my $year = year_from_rollno($rollno);
 
     my $credits = $students{$rollno}{"credits"};
+    if ($phase =~ /2B/ && !defined($p2_students{$rollno})) {
+
+      #print "$rollno: seniority lost due to late phase 2 submission\n";
+      return ($current_year + 1, "NO:LATE");
+    }
     if ($credits >= $credits_pass) {
 
       #print "$rollno: seniority lost due to credit completion\n";
-      return $current_year;
+      return ($current_year, "NO:CRED");
     }
     if ($phase =~ /2/ && !defined($p1_students{$rollno})) {
 
       #print "$rollno: seniority lost due to missing phase 1\n";
-      return $current_year;
+      return ($current_year, "NO:P1");
     }
     if ($phase =~ /2B/ && $year != $current_year - 1
 	&& !defined($p2a_students{$rollno})) {
 
       #print "$rollno: seniority lost due to missing phase 2A\n";
-      return $current_year;
+      return ($current_year, "NO:P2A");
     }
-    return $year;
+    return ($year, "$year");
 }
 
 # load roll numbers of students who registered in phase 1
@@ -181,6 +191,24 @@ sub load_p2a_students ($)
        s/^\s*//g;
        s/\s*$//g;
        $p2a_students{$_} = 1;
+    }
+
+    close IN;
+}
+
+# load roll numbers of students who registered in phase 1
+sub load_p2_students ($)
+{
+    my $filename = shift;
+
+    open IN, "<$filename" or die "Can't open $filename: $!";
+
+    while (<IN>) {
+       chomp;
+       s/;.*//;
+       s/^\s*//g;
+       s/\s*$//g;
+       $p2_students{$_} = 1;
     }
 
     close IN;
@@ -287,8 +315,8 @@ sub print_courses ()
             $courses{$code}{"name"},
             $courses{$code}{"instructor"},
             $courses{$code}{"cap"},
-            $courses{$code}{"slot"} || ""),
-            $courses{$code}{"mincap"}, "\n";
+            $courses{$code}{"slot"} || "",
+            $courses{$code}{"mincap"}), "\n";
     }
     print "\n";
 }
@@ -341,12 +369,22 @@ sub load_students($)
         $students{$rollno}{"email"} = $email;
         $students{$rollno}{"cgpa"} = $cgpa;
         $students{$rollno}{"credits"} = $credits;
-        $students{$rollno}{"seniority"} = seniority_from_rollno($rollno);
+        ($students{$rollno}{"seniority"},
+	 $students{$rollno}{"senreason"}) = seniority_from_rollno($rollno);
+        $students{$rollno}{"nallowed"} = courses_allowed($rollno);
         $students{$rollno}{"site"} = $site;
     }
 
     close IN;
     return $errors;
+}
+
+sub courses_allowed()
+{
+  my $rollno = shift;
+  return ($max_courses - 
+	  (defined($project_students{$rollno}) ? 1 : 0) -
+	  (($students{$rollno}{'cgpa'} < $min_cgpa_four_courses) ? 1 : 0));
 }
 
 sub print_students ()
