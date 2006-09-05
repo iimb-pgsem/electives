@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: sendmails.pl,v 1.3 2006/04/30 08:00:35 a14562 Exp $
+# $Id: sendmails.pl,v 1.4 2006/09/05 19:52:26 a14562 Exp $
 
 use strict;
 
@@ -9,10 +9,10 @@ use Net::POP3;
 use MIME::Lite;
 
 my $pop_required = 1;
-my $login = 'sankara';
-my $password = 'brealy16myers';
+my $login = 'pgsemelectives@sankara.net';
+my $password = 'bo$$no1';
 
-my $debug = 1;
+my $debug = 0;
 
 sub send_mail ($$$$$)
 {
@@ -27,6 +27,7 @@ sub send_mail ($$$$$)
         my $msg = MIME::Lite->new(
             From => $from,
             To => $to,
+            # To => 'kvsankar@gmail.com',
             Subject => $subject,
             Type => 'multipart/mixed');
 
