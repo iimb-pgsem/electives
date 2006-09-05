@@ -1,84 +1,23 @@
 #perl -w
 
-# $Id: mailresults.pl,v 1.3 2006/02/12 11:49:30 a14562 Exp $
+# $Id: mailresults.pl,v 1.4 2006/09/05 19:52:56 a14562 Exp $
+
+my %senreasons = 
+  (
+   "NO:P1" => "Missed phase 1",
+   "NO:CRED" => "Completion of credits",
+   "NO:P2A" => "Missed phase 2A",
+   "NO:LATE" => "Late submission"
+  );
 
 use strict;
 
 use POSIX;
 
+use Elec;
+use ElecUtils;
+
 my %allocation;
-
-# === begin library
-
-my %courses;
-my $default_cap = 65;
-my $default_status = 'R'; # running
-
-sub err_print($)
-{
-    my $msg = shift;
-    print STDERR $msg, "\n";
-}
-
-sub skip_line($)
-{
-    my $line = shift;
-    return 1 if ($line =~ /^\s*\#/); # comment lines
-    return 1 if ($line =~ /^\s*$/); # blank lines
-    return 0;
-}
-
-sub load_courses($)
-{
-    my $file = shift;
-    open IN, "<$file" or die "Can't open file $file: $!";
-    while (<IN>) {
-        chomp;
-        next if skip_line($_);
-        my ($code, $name, $instructor, $cap, $slot, $status) = 
-            split(/\s*\;\s*/, $_) unless skip_line($_); 
-
-        $cap = undef if (defined($cap) && ($cap eq ''));
-        $slot = undef if (defined($slot) && ($slot eq ''));
-        $status = undef if (defined($status) && ($status eq ''));
-        # status can be 'A' (active) or 'D' dropped
-
-        if (!defined($code) || ($code eq "")) {
-            err_print("error:$file:$.: no course code");
-            next;
-        }
-
-        if (defined($courses{$code})) {
-            err_print("error:$file:$.: course '$code' already defined");
-            next;
-        }
-
-        if (defined($cap) && ($cap < 1)) {
-            err_print("error:$file:$.: invalid cap '$cap'");
-            next;
-        }
-
-        if (defined($status) && !($status =~ /[AD]/)) {
-            err_print("error:$file:$.: invalid status '$status'");
-            next;
-        }
-
-        $name ||= "";
-        $instructor ||= "";
-        $cap ||= $default_cap;
-        $status ||= $default_status;
-
-        $courses{$code}{"name"} = $name;
-        $courses{$code}{"instructor"} = $instructor;
-        $courses{$code}{"cap"} = $cap;
-        $courses{$code}{"slot"} = $slot;
-        $courses{$code}{"status"} = $status;
-
-    }
-    close IN;
-}
-
-# === end library
 
 sub load_allocation ($)
 {
@@ -89,7 +28,8 @@ sub load_allocation ($)
     while (<IN>) {
         chomp;
         
-        my ($rollno, $name, $email, $nasked, $nallotted, $ca) = 
+        my ($rollno, $name, $email, $nasked, $nallowed, 
+	    $nallotted, $seniority, $senreason, $ca) = 
           split(/\s*;\s*/);
 
         my @calist = split(/,/, $ca);
@@ -106,7 +46,10 @@ sub load_allocation ($)
         $allocation{$rollno}{'name'} = $name;
         $allocation{$rollno}{'email'} = $email;
         $allocation{$rollno}{'nasked'} = $nasked;
+        $allocation{$rollno}{'nallowed'} = $nallowed;
         $allocation{$rollno}{'nallotted'} = $nallotted;
+        $allocation{$rollno}{'seniority'} = $seniority;
+        $allocation{$rollno}{'senreason'} = $senreason;
         $allocation{$rollno}{'clist'} = \@clist;
         $allocation{$rollno}{'alloc'} = \%alloc;
     }
@@ -133,8 +76,14 @@ sub write_mailbody_files($)
         print OUT "Roll number: $rollno\n";
         print OUT "Name: $allocation{$rollno}{'name'}\n";
         print OUT "E-Mail: $allocation{$rollno}{'email'}\n";
+        print OUT "Seniority: "
+	  . (($allocation{$rollno}{'seniority'} ne $allocation{$rollno}{'senreason'})
+	    ? "None ($senreasons{$allocation{$rollno}{'senreason'}})"
+	    : "$allocation{$rollno}{'seniority'}")
+	    . "\n";
         print OUT "\n\n";
         print OUT "#Courses asked: $allocation{$rollno}{'nasked'}\n";
+        print OUT "#Courses max allowed: $allocation{$rollno}{'nallowed'}\n";
         print OUT "#Courses allotted: $allocation{$rollno}{'nallotted'}\n";
         print OUT "\n\n";
 
@@ -210,7 +159,7 @@ EOF
 
 sub main
 {
-    load_courses("courses.txt");
+    load_courses("courses-internal.txt", 1);
     load_allocation("allocation-internal.txt");
 
     write_mailbody_files("mailbodies");
