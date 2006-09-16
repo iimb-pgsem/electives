@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-# $Id: electives.cgi,v 1.32 2006/08/25 14:17:41 a14562 Exp $
+# $Id: electives.cgi,v 1.33 2006/09/16 13:41:06 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -71,7 +71,7 @@ sub load_allocations($)
     LINE: while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($rollno, $name, $email, $asked, $alloted, $allocationlist) = 
+        my ($rollno, $name, $email, $asked, $allowed, $alloted, $sen, $senreason, $allocationlist) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $allocationlist = undef if (defined($allocationlist) && ($allocationlist eq ''));
@@ -1482,6 +1482,8 @@ sub print_p3ack_page ()
 
         my $rv = delete_changes_from_db($rollno);
         return if ($rv != 0);
+
+        log_db("OK: changes: rollno=$rollno, request=cancel");
 
         print "Your previous request has been cancelled.", br;
         print local_end_html;
