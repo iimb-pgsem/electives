@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.23 2006/09/20 07:00:15 a14562 Exp $
+# $Id: elec.pl,v 1.24 2006/09/20 17:48:27 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -1490,6 +1490,66 @@ sub write_p3excel ()
     $summaryext->set_column(1, 1, $name_width);
     $summaryext->write(0, 2, "#Courses", $formatext);
 
+    my $capsint = $workbookint->add_worksheet("Courses");
+    $capsint->set_paper(9);
+    $capsint->set_landscape();
+    $capsint->fit_to_pages(1);
+    $capsint->set_header("&C$title: &A");
+    $capsint->set_footer("&C$footer&R&P of &N");
+
+    my $capsext = $workbookext->add_worksheet("Courses");
+    $capsext->set_paper(9);
+    $capsext->set_landscape();
+    $capsext->fit_to_pages(1);
+    $capsext->set_header("&C$title: &A");
+    $capsext->set_footer("&C$footer&A&R&P of &N");
+
+    my $col = 0;
+    $capsint->write(0, $col++, "Course id", $formatint);
+    $capsint->write(0, $col++, "Maxcap", $formatint);
+    $capsint->write(0, $col++, "Mincap", $formatint);
+    $capsint->write(0, $col++, "# enrolled", $formatint);
+    $capsint->write(0, $col++, "# available", $formatint);
+
+    $col = 0;
+    $capsext->write(0, $col++, "Course id", $formatint);
+    $capsext->write(0, $col++, "Maxcap", $formatint);
+    $capsext->write(0, $col++, "Mincap", $formatint);
+    $capsext->write(0, $col++, "# enrolled", $formatint);
+    $capsext->write(0, $col++, "# available", $formatint);
+
+    my $row = 1;
+    for my $c (sort keys %courses) {
+
+      next if ($courses{$c}{"status"} ne 'A');
+
+      $col = 0;
+      $capsint->write($row, $col++, $c, $formatint);
+      $capsint->write($row, $col++, ($courses{$c}{"nocap"}
+				    ?"NA"
+				    :$courses{$c}{"cap"}));
+      $capsint->write($row, $col++, $courses{$c}->{"mincap"});
+      $capsint->write($row, $col++, $p3calloc{$c}{"nstudents"});
+      $capsint->write($row, $col++, ($courses{$c}{"nocap"}
+				    ?"NA"
+				    :($courses{$c}{"cap"}
+				      - $p3calloc{$c}{"nstudents"})));
+
+      $col = 0;
+      $capsext->write($row, $col++, $c, $formatint);
+      $capsext->write($row, $col++, ($courses{$c}{"nocap"}
+				    ?"NA"
+				    :$courses{$c}{"cap"}));
+      $capsext->write($row, $col++, $courses{$c}->{"mincap"});
+      $capsext->write($row, $col++, $p3calloc{$c}{"nstudents"});
+      $capsext->write($row, $col++, ($courses{$c}{"nocap"}
+				    ?"NA"
+				    :($courses{$c}{"cap"}
+				      - $p3calloc{$c}{"nstudents"})));
+      
+      ++$row;
+    }
+
     my $p3int = $workbookint->add_worksheet("Phase 3");
     $p3int->set_paper(9);
     $p3int->set_landscape();
@@ -1497,7 +1557,7 @@ sub write_p3excel ()
     $p3int->set_header("&C$title: &A");
     $p3int->set_footer("&C$footer&R&P of &N");
 
-    my $col = 0;
+    $col = 0;
     $p3int->write(0, $col++, "S. No.", $formatint);
     $p3int->set_column($col, $col, $rollno_width);
     $p3int->write(0, $col++, "Roll No.", $formatint);
@@ -1511,7 +1571,7 @@ sub write_p3excel ()
     $p3int->write(0, $col++, "Status", $formatint);
     $p3int->write(0, $col++, "Reason", $formatint);
 
-    my $row = 1;
+    $row = 1;
     for my $rollno (sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } keys %p3choices) {
 
       $col = 0;
@@ -1552,8 +1612,8 @@ sub write_p3excel ()
         $summaryint->write(0, $coursecount + 3, $course, $formatint);
         $summaryext->write(0, $coursecount + 3, $course, $formatext);
 
-        my $row = 0;
-        my $col = 0;
+        $row = 0;
+        $col = 0;
 
         for ($col = 0; $col < @header; ++$col) {
             $sheetint->write($row, $col, $header[$col], $formatint);
