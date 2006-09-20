@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.22 2006/08/30 17:49:38 a14562 Exp $
+# $Id: elec.pl,v 1.23 2006/09/20 07:00:15 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -70,6 +70,8 @@ use ElecUtils;
 use ElecConfig;
 use Elec;
 
+my $p3mailbodies_path = "p3mailbodies/";
+
 my %allocation;
 # allocation hash (computed hash):
 # key is course code
@@ -80,6 +82,22 @@ my %allocation;
 # 
 # each studentlist element is hash reference where the hash holds
 # rollno, priority, cgpa
+
+my %p3choices;
+# choices hash:
+# key is rollno; exists in students hash
+# value is a hash keyed by attributes:
+# trtype - transaction type =~ /^[ADS]$/
+# add - course to be added, defined if trtype =~ /^[AS]$/
+# drop - course to be dropped, defined if trtype =~ /^[DS]$/
+# status =~ /^[PDN]$/ meanings - Pending, Done, Not possible
+
+my @late_changes;
+# late changes list
+# each item is a hash keyed by attributes:
+# rollno - roll no
+# trtype - transaction type =~ /^[ADX]$/
+# courses - a list of course ids
 
 my %p3salloc;
 # allocation hash (computed) as input for phase 3 by students
@@ -99,6 +117,20 @@ my %courses_capped;
 # value is a hash keyed by attributes
 # year, priority, cgpa at which the course capped
 
+my %trtype_label =
+  (
+   "A" => "Add",
+   "D" => "Drop",
+   "S" => "Swap"
+  );
+
+my %status_label =
+  (
+   "D" => "Successful",
+   "N" => "Unsuccessful",
+   "P" => "Pending"
+  );
+
 my @ranklist; 
 # ranklist (computed) covering all students (not specific to courses)
 
@@ -106,6 +138,7 @@ my @ranklist;
 my $rollno_width = 15;
 my $name_width = 35;
 my $email_width = 35;
+my $status_width = 20;
 
 my $allotted_color = '#CCFFFF';
 my $capped_color = '#FFCC00';
@@ -113,6 +146,9 @@ my $complete_color = '#C0C0C0';
 my $sc_color = '#FF00FF';
 my $ot_color = '#FF9900';
 my $dropped_color = '#008080';
+my $successful_color = '#80FF80';
+my $unsuccessful_color = '#FF8080';
+my $pending_color = '#0000FF';
 
 sub by_student_rank
 {
@@ -1009,8 +1045,10 @@ sub load_allocations($)
     LINE: while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($rollno, $name, $email, $asked, $alloted, $allocationlist) = 
-            split(/\s*\;\s*/, $_) unless skip_line($_); 
+
+        my ($rollno, $name, $email, $asked, $allowed,
+	    $alloted, $seniority, $senreason, $allocationlist) = 
+	      split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $allocationlist = undef if (defined($allocationlist) && ($allocationlist eq ''));
 
@@ -1076,7 +1114,6 @@ sub print_allocations ()
     print "\n";
 }
 
-
 sub load_p3choices($)
 {
     my $file = shift;
@@ -1105,7 +1142,7 @@ sub load_p3choices($)
             next;
         } 
 
-	if (!defined($trtype) || ($trtype !~ /^[DAB]$/)) {
+	if (!defined($trtype) || ($trtype !~ /^[DAS]$/)) {
             err_print("error:$file:$.: transaction type '$trtype' invalid");
             next;
 	}
@@ -1116,7 +1153,7 @@ sub load_p3choices($)
         }
 
 	my ($drop, $add) = (undef, undef);
-	if ($trtype eq "B") {
+	if ($trtype eq "S") {
 
 	  ($drop, $add) = split(/\s*,\s*/, $courselist);
 	  if (!defined($drop) || !defined($add)) {
@@ -1155,25 +1192,12 @@ sub load_p3choices($)
 	  next;
 	}
 
-	if ($trtype eq "A") {
-
-	  my $allowed = $students{$rollno}{"nallowed"};
-
-	  my $allotted = (keys %{$p3salloc{$rollno}{"courses"}});
-	  if ($allotted >= $allowed) {
-
-	    err_print("error:$file:$.: cannot add '$add' for '$rollno', not allowed");
-            next;
-	  }
-	}
-
-	if ($trtype =~ /^[AB]$/) {
+	if ($trtype =~ /^[AS]$/) {
 
 	  my @curcourses = (keys %{$p3salloc{$rollno}{"courses"}});
 	  for my $c (@curcourses) {
 
-	    next if ($trtype eq "B" && $c eq $drop);
-	    print "Checking conflict for $rollno between $c and $add\n";
+	    next if ($trtype eq "S" && $c eq $drop);
 	    if (courses_conflict($c, $add)) {
 
 	      err_print("error:$file:$.: cannot add '$add' for '$rollno', conflicts with '$c'");
@@ -1187,6 +1211,10 @@ sub load_p3choices($)
 	$p3choices{$rollno}{"add"} = $add if (defined($add));
 	$p3choices{$rollno}{"drop"} = $drop if (defined($drop));
 	$p3choices{$rollno}{"status"} = 'P';
+	for my $course (sort keys %{$p3salloc{$rollno}{"courses"}}) {
+
+	  $p3choices{$rollno}{"courses"}{$course} = 1;
+	}
     }
     close IN;
 }
@@ -1210,12 +1238,8 @@ sub print_given_p3choices
     my $choices = shift;
     print "=== Remaining P3 choices ===\n";
     foreach my $rollno (@{$choices}) {
-        print join('; ',
-		   $rollno,
-		   $p3choices{$rollno}{"trtype"},
-		   $p3choices{$rollno}{"drop"} || "-",
-		   $p3choices{$rollno}{"add"} || "-",
-		   $p3choices{$rollno}{"status"}), "\n";
+
+      print_p3request($rollno);
     }
     print "\n";
 }
@@ -1237,11 +1261,22 @@ sub execute_p3request {
     }
     else {
 
+      $p3choices{$rollno}{"reason"} = "Quorum";
       return 0;
     }
   }
   if ($p3choices{$rollno}{"trtype"} eq "A") {
  
+    # Check for max allowed
+    my $allowed = $students{$rollno}{"nallowed"};
+    my $allotted = (keys %{$p3salloc{$rollno}{"courses"}});
+    if ($allotted >= $allowed) {
+      
+      $p3choices{$rollno}{"status"} = "N";
+      $p3choices{$rollno}{"reason"} = "Allowed: " . $allowed;
+      return 0;
+    }
+
     my $c = $p3choices{$rollno}{"add"};
     if ($p3calloc{$c}{"nstudents"} < $courses{$c}{"cap"}) {
 
@@ -1254,10 +1289,11 @@ sub execute_p3request {
     }
     else {
 
+      $p3choices{$rollno}{"reason"} = "Capped";
       return 0;
     }
   }
-  if ($p3choices{$rollno}{"trtype"} eq "B") {
+  if ($p3choices{$rollno}{"trtype"} eq "S") {
  
     my $a = $p3choices{$rollno}{"add"};
     my $d = $p3choices{$rollno}{"drop"};
@@ -1276,27 +1312,100 @@ sub execute_p3request {
       $p3choices{$rollno}{"status"} = "D";
       return 1;
     }
+    else {
+
+      if ($p3calloc{$a}{"nstudents"} >= $courses{$a}{"cap"}) {
+
+	$p3choices{$rollno}{"reason"} = "Capped";
+      }
+      elsif ($p3calloc{$d}{"nstudents"} <= $courses{$d}{"mincap"}) {
+
+	$p3choices{$rollno}{"reason"} = "Quorum";
+      }
+    }
   }
   return 0;
 }
 
+sub print_p3request
+{
+  my $rollno = shift;
+  print join('; ',
+	     $rollno,
+	     $p3choices{$rollno}{"trtype"},
+	     $p3choices{$rollno}{"drop"} || "-",
+	     $p3choices{$rollno}{"add"} || "-",
+	     $p3choices{$rollno}{"status"}), "\n";
+}
+
 sub add_drop_p3choices ()
 {
+ ROUND1:
   while (1) {
 
-    my $done = 1;
     my @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } grep { $p3choices{$_}{"status"} eq "P" } keys %p3choices;
     last if (scalar(@p3pending) == 0);
-    print_given_p3choices(\@p3pending);
     for my $rollno (@p3pending) {
 
       if (execute_p3request($rollno)) {
 
-	$done = 0;
+	print "Successful: ";
+	print_p3request($rollno);
+	# Restart the work
+	next ROUND1;
       }
     }
-    last if ($done);
+    # If we reach here, there was no work to do
+    last ROUND1;
   }
+  # Done with round 1 where all non-cyclical requests are executed
+  # No more "A" and "D" are possible. Only "S" may be possible due
+  # to their cyclical nature. Thus mark all "A" and "D" with
+  # status "N".
+  my @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } grep { $p3choices{$_}{"status"} eq "P" } keys %p3choices;
+  for my $rollno (@p3pending) {
+
+    if ($p3choices{$rollno}{trtype} =~ /^[AD]$/) {
+      
+      print "Unuccessful: ";
+      print_p3request($rollno);
+      $p3choices{$rollno}{status} = "N";
+    }
+  }
+  @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } grep { $p3choices{$_}{"status"} eq "P" } keys %p3choices;
+  print_given_p3choices(\@p3pending);
+  # Now find out the surely non-cyclic ones and throw them out
+ ROUND2:
+  my $not_done = 1;
+  while ($not_done) {
+
+    $not_done = 0;
+    # First do a count
+    my %swaps;
+    my @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} }
+      grep { $p3choices{$_}{"status"} eq "P" && $p3choices{$_}{"trtype"} eq "S"} keys %p3choices;
+    for my $rollno (@p3pending) {
+
+      $swaps{$p3choices{$rollno}{"add"}}{"add"}++;
+      $swaps{$p3choices{$rollno}{"drop"}}{"drop"}++;
+    }
+    for my $rollno (@p3pending) {
+
+      if ((!defined($swaps{$p3choices{$rollno}{"drop"}}{"add"})
+	   || $swaps{$p3choices{$rollno}{"drop"}}{"add"} == 0) ||
+	  (!defined($swaps{$p3choices{$rollno}{"add"}}{"drop"}) ||
+	   $swaps{$p3choices{$rollno}{"add"}}{"drop"} == 0)) {
+
+	# Ends or starts in a one way node. Not possible to execute
+	print "Unuccessful: ";
+	print_p3request($rollno);
+	$p3choices{$rollno}{status} = "N";
+	$not_done = 1;
+      }
+    }    
+  }
+  @p3pending = sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } grep { $p3choices{$_}{"status"} eq "P" } keys %p3choices;
+  print_given_p3choices(\@p3pending);
 }
 
 sub print_remaining_p3choices ()
@@ -1304,8 +1413,443 @@ sub print_remaining_p3choices ()
   print_p3choices;
 }
 
+sub get_p3format
+{
+  my $rollno = shift;
+  my $formats = shift;
+  if ($p3choices{$rollno}{"status"} eq "D") {
+
+    return $formats->[0];
+  }
+  elsif ($p3choices{$rollno}{"status"} eq "N") {
+
+    return $formats->[1];
+  }
+  else {
+
+    return $formats->[2];
+  }
+}
+
 sub write_p3excel ()
 {
+    # Generate two workbooks, internal and external.
+    my $workbookint = Spreadsheet::WriteExcel->new("final-allocation-internal.xls");
+    my $workbookext = Spreadsheet::WriteExcel->new("final-allocation.xls");
+
+    # color pallettes for both
+    $workbookint->set_custom_color(40, $successful_color);
+    $workbookint->set_custom_color(41, $unsuccessful_color);
+    $workbookint->set_custom_color(42, $pending_color);
+
+    $workbookext->set_custom_color(40, $successful_color);
+    $workbookext->set_custom_color(41, $unsuccessful_color);
+    $workbookext->set_custom_color(42, $pending_color);
+
+    my $successful_cfint = $workbookint->add_format(bg_color=>40);
+    my $unsuccessful_cfint = $workbookint->add_format(bg_color=>41);
+    my $pending_cfint = $workbookint->add_format(bg_color=>42);
+    my @intformats = ($successful_cfint, $unsuccessful_cfint, $pending_cfint);
+
+    my $successful_cfext = $workbookext->add_format(bg_color=>40);
+    my $unsuccessful_cfext = $workbookext->add_format(bg_color=>41);
+    my $pending_cfext = $workbookext->add_format(bg_color=>42);
+    my @extformats = ($successful_cfext, $unsuccessful_cfext, $pending_cfext);
+
+    # Headers for both
+    my @header = ('SNo', 'Roll Number', 'Name', 'E-mail');
+
+    my $formatint = $workbookint->add_format();
+    $formatint->set_bold();
+    my $formatext = $workbookext->add_format();
+    $formatext->set_bold();
+
+    my $summaryint = $workbookint->add_worksheet("Summary");
+    $summaryint->set_paper(9);
+    $summaryint->set_landscape();
+    $summaryint->fit_to_pages(1);
+    $summaryint->set_header("&C$title: &A");
+    $summaryint->set_footer("&C$footer&R&P of &N");
+
+    my $summaryext = $workbookext->add_worksheet("Summary");
+    $summaryext->set_paper(9);
+    $summaryext->set_landscape();
+    $summaryext->fit_to_pages(1);
+    $summaryext->set_header("&C$title: &A");
+    $summaryext->set_footer("&C$footer&A&R&P of &N");
+
+    $summaryint->write(0, 0, "Roll Number", $formatint);
+    $summaryint->set_column(0, 0, $rollno_width);
+    $summaryint->write(0, 1, "Name", $formatint);
+    $summaryint->set_column(1, 1, $name_width);
+    $summaryint->write(0, 2, "#Courses", $formatint);
+
+    $summaryext->write(0, 0, "Roll Number", $formatext);
+    $summaryext->set_column(0, 0, $rollno_width);
+    $summaryext->write(0, 1, "Name", $formatext);
+    $summaryext->set_column(1, 1, $name_width);
+    $summaryext->write(0, 2, "#Courses", $formatext);
+
+    my $p3int = $workbookint->add_worksheet("Phase 3");
+    $p3int->set_paper(9);
+    $p3int->set_landscape();
+    $p3int->fit_to_pages(1);
+    $p3int->set_header("&C$title: &A");
+    $p3int->set_footer("&C$footer&R&P of &N");
+
+    my $col = 0;
+    $p3int->write(0, $col++, "S. No.", $formatint);
+    $p3int->set_column($col, $col, $rollno_width);
+    $p3int->write(0, $col++, "Roll No.", $formatint);
+    $p3int->set_column($col, $col, $name_width);
+    $p3int->write(0, $col++, "Name", $formatint);
+    $p3int->write(0, $col++, "CGPA", $formatint);
+    $p3int->write(0, $col++, "Request", $formatint);
+    $p3int->write(0, $col++, "Drop", $formatint);
+    $p3int->write(0, $col++, "Add", $formatint);
+    $p3int->set_column($col, $col, $status_width);
+    $p3int->write(0, $col++, "Status", $formatint);
+    $p3int->write(0, $col++, "Reason", $formatint);
+
+    my $row = 1;
+    for my $rollno (sort { $students{$b}{"cgpa"} <=> $students{$a}{"cgpa"} } keys %p3choices) {
+
+      $col = 0;
+      $p3int->write($row, $col++, $row, get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $rollno." ", get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $students{$rollno}{"name"}, get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $students{$rollno}{"cgpa"}, get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $trtype_label{$p3choices{$rollno}{"trtype"}}, get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $p3choices{$rollno}{"drop"} || "-", get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $p3choices{$rollno}{"add"} || "-", get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, $status_label{$p3choices{$rollno}{"status"}}, get_p3format($rollno, \@intformats));
+      $p3int->write($row, $col++, ($p3choices{$rollno}{"status"} eq "N") ? $p3choices{$rollno}{"reason"} : "", get_p3format($rollno, \@intformats));
+      ++$row;
+    }
+
+    my $coursecount = 0;
+    my %studentrow;
+
+    foreach my $course (sort keys %courses) {
+
+        next if ($courses{$course}{"status"} eq 'D');
+
+        print "Writing spreadsheet information for $course\n";
+        my $sheetint = $workbookint->add_worksheet($course);
+        $sheetint->set_paper(9);
+        $sheetint->set_portrait();
+        $sheetint->fit_to_pages(1);
+        $sheetint->set_header("&C$title: &A");
+        $sheetint->set_footer("&C$footer&R&P of &N");
+
+        my $sheetext = $workbookext->add_worksheet($course);
+        $sheetext->set_paper(9);
+        $sheetext->set_portrait();
+        $sheetext->fit_to_pages(1);
+        $sheetext->set_header("&C$title: &A");
+        $sheetext->set_footer("&C$footer&R&P of &N");
+
+        $summaryint->write(0, $coursecount + 3, $course, $formatint);
+        $summaryext->write(0, $coursecount + 3, $course, $formatext);
+
+        my $row = 0;
+        my $col = 0;
+
+        for ($col = 0; $col < @header; ++$col) {
+            $sheetint->write($row, $col, $header[$col], $formatint);
+            $sheetext->write($row, $col, $header[$col], $formatext);
+        }
+
+        $row = 1;
+        $col = 0;
+	for my $rollno (sort keys %{$p3calloc{$course}{"students"}}) {
+
+	  $sheetext->set_column($col, $col, $rollno_width);
+	  $sheetext->write($row, $col++, $row);
+	  $sheetext->set_column($col, $col, $rollno_width);
+	  $sheetext->write($row, $col++, $rollno." ");
+	  $sheetext->set_column($col, $col, $name_width);
+	  $sheetext->write($row, $col++, $students{$rollno}{"name"});
+	  $sheetext->set_column($col, $col, $email_width);
+	  $sheetext->write($row, $col++, $students{$rollno}{"email"});
+	  $col = 0;
+
+	  $sheetint->set_column($col, $col, $rollno_width);
+	  $sheetint->write($row, $col++, $row);
+	  $sheetint->set_column($col, $col, $rollno_width);
+	  $sheetint->write($row, $col++, $rollno." ");
+	  $sheetint->set_column($col, $col, $name_width);
+	  $sheetint->write($row, $col++, $students{$rollno}{"name"});
+	  $sheetint->set_column($col, $col, $email_width);
+	  $sheetint->write($row, $col++, $students{$rollno}{"email"});
+	  $col = 0;
+
+	  ++$row;
+	}
+
+
+        ++$coursecount;
+    }
+
+    $row = 1;
+    foreach my $rollno (sort keys %p3salloc) {
+
+        # print "Writing summary for $rollno\n";
+        $summaryint->write($row, 0, $rollno." ");
+        $summaryint->write($row, 1, $students{$rollno}->{"name"});
+        $summaryint->write($row, 2, scalar(keys %{$p3salloc{$rollno}{"courses"}}));
+
+        $summaryext->write($row, 0, $rollno." ");
+        $summaryext->write($row, 1, $students{$rollno}->{"name"});
+        $summaryext->write($row, 2, scalar(keys %{$p3salloc{$rollno}{"courses"}}));
+       
+        my $courseno = 0;
+        foreach my $course (sort keys %courses) {
+            
+            next if ($courses{$course}{'status'} eq 'D');
+
+            if (defined($p3salloc{$rollno}{"courses"}{$course})) {
+
+                $summaryint->write($row, $courseno + 3, $course);
+                $summaryext->write($row, $courseno + 3, $course);
+            }
+
+            ++$courseno;
+        }
+        ++$row;
+    }
+}
+
+sub write_p3mailbodies
+{
+  for my $rollno (sort keys %p3choices) {
+
+    my $filename = "$p3mailbodies_path$rollno.txt";
+    open OUT, ">$filename" or die "Can't open $filename: $!";
+    print OUT "Please find the results of the phase 3 of the course allocation below:\n\n";
+    print OUT "Roll number: $rollno\n";
+    print OUT "Name: ". $students{$rollno}{"name"} . "\n";
+    print OUT "E-Mail: " . $students{$rollno}{"email"} . "\n\n";
+    my $ncourses = scalar(keys %{$p3choices{$rollno}{"courses"}});
+    if ($ncourses > 0) {
+
+      if ($ncourses == 1) {
+
+	print OUT "Your only course before phase 3 was as follows:\n";
+      }
+      else {
+
+	print OUT "Your $ncourses courses before phase 3 were as follows:\n";
+      }
+      for my $course (sort keys %{$p3choices{$rollno}{"courses"}}) {
+
+	print OUT "$course - " . $courses{$course}{"name"} . "\n";
+      }
+    }
+    else {
+
+      print OUT "Your had no courses before phase 3.\n";
+    }
+    print OUT "\nYour request was to ";
+    if ($p3choices{$rollno}{"trtype"} eq "A") {
+
+      print OUT "add course " . $p3choices{$rollno}{"add"} . ".\n\n";
+    }
+    elsif ($p3choices{$rollno}{"trtype"} eq "D") {
+
+      print OUT "drop course " . $p3choices{$rollno}{"drop"} . ".\n\n";
+    }
+    else {
+
+      print OUT "swap course " . $p3choices{$rollno}{"drop"} . " with " . $p3choices{$rollno}{"add"} . ".\n\n";
+    }
+    if ($p3choices{$rollno}{"status"} eq "D") {
+
+      print OUT "This request was successful.\n\n";
+    }
+    elsif ($p3choices{$rollno}{"status"} eq "N") {
+
+      print OUT "This request was not successful as ";
+      if ($p3choices{$rollno}{"reason"} eq "Capped") {
+
+	print OUT "the course you wished to add (" . $p3choices{$rollno}{"add"} . ") is capped.\n\n";
+      }
+      elsif ($p3choices{$rollno}{"reason"} eq "Quorum") {
+
+	print OUT "the course you wished to drop (" . $p3choices{$rollno}{"drop"} . ") will fall short of minimum requirements.\n\n";
+      }
+      elsif ($p3choices{$rollno}{"reason"} =~ "Allowed:") {
+
+	print OUT "you have already taken maximum number of courses and are not allowed to take one more.\n\n";
+      }
+      else {
+
+	print OUT "it happens.\n\n";
+      }
+    }
+    else {
+
+      print OUT "This request is still pending, please contact PGSEM office.\n\n";
+    }
+    $ncourses = scalar(keys %{$p3salloc{$rollno}{"courses"}});
+    if ($ncourses > 0) {
+
+      if ($ncourses == 1) {
+
+	print OUT "Your only course after phase 3 is as follows:\n";
+      }
+      else {
+
+	print OUT "Your $ncourses courses after phase 3 are as follows:\n";
+      }
+      for my $course (sort keys %{$p3salloc{$rollno}{"courses"}}) {
+
+	print OUT "$course - " . $courses{$course}{"name"} . "\n";
+      }
+    }
+    else {
+
+      print OUT "Your have no courses after phase 3.\n";
+    }
+    print OUT "\nFor any clarifications regarding the allocation, please get in touch with the PGSEM office.\n";
+    print OUT "-- \nAbhay Ghaisas and Sankaranaryananan K. V.\n";
+    print OUT "pgsemelectives\@sankara.net\n";
+    close OUT;
+  }
+}
+
+sub load_late_changes($)
+{
+  my $file = shift;
+  open IN, "<$file" or die "Can't open file $file: $!";
+ LINE: while (<IN>) {
+    chomp;
+    next if skip_line($_);
+    my ($rollno, $trtype, $courselist) = 
+      split(/\s*\;\s*/, $_) unless skip_line($_); 
+
+    $courselist = undef if (defined($courselist) && ($courselist eq ''));
+    $trtype = undef if (defined($trtype) && ($trtype eq ''));
+    
+    if (!defined($rollno) || ($rollno eq "")) {
+      err_print("error:$file:$.: no roll number");
+      next;
+    }
+
+    unless (defined($students{$rollno})) {
+      err_print("error:$file:$.: roll number '$rollno' not defined");
+      next;
+    }
+
+    if (!defined($trtype) || ($trtype !~ /^[ADX]$/)) {
+      err_print("error:$file:$.: transaction type '$trtype' invalid");
+      next;
+    }
+
+    my @cour = ();
+    if (defined($courselist)) {
+
+      for my $c (split(/,/, $courselist)) {
+
+	$c .= "-" . $students{$rollno}{"site"};
+	if (!(defined($courses{$c}))) {
+
+	  err_print("error:$file:$.: invalid course '$c'");
+	  next LINE;
+	}
+	push (@cour, $c);
+      }
+    }
+    my %rec = ();
+    $rec{"rollno"} = $rollno;
+    $rec{"trtype"} = $trtype;
+    $rec{"courselist"} = \@cour;
+    push(@late_changes, \%rec);
+  }
+}
+
+sub print_late_changes ()
+{
+    print "=== Late changes ===\n";
+    foreach my $rec (@late_changes) {
+      my $cl = $rec->{"courselist"};
+        print join('; ',
+		   $rec->{"rollno"},
+		   $rec->{"trtype"},
+		   join(', ', @$cl)), "\n";
+    }
+    print "\n";
+}
+
+sub execute_late_request
+{
+  my $rollno = shift;
+  my $trtype = shift;
+  my $course = shift;
+  if ($trtype eq "D") {
+
+    if ($p3calloc{$course}{"nstudents"}
+	> $courses{$course}{"mincap"}) {
+
+      # Possible to drop
+      $p3calloc{$course}{"nstudents"}--;
+      delete($p3calloc{$course}{"students"}{$rollno});
+      delete($p3salloc{$rollno}{"courses"}{$course});
+      print("Late req succeeded:$rollno, $trtype, $course\n");
+    }
+    else {
+
+      print("Late req failed:Mincap:$rollno, $trtype, $course\n");
+    }
+  }
+  else {
+
+    my $allowed = $students{$rollno}{"nallowed"};
+    my $allotted = (keys %{$p3salloc{$rollno}{"courses"}});
+    if ($allotted >= $allowed) {
+      
+      print("Late req failed:Allowed $allowed:$rollno, $trtype, $course\n");
+      return;
+    }
+    if ($p3calloc{$course}{"nstudents"} < $courses{$course}{"cap"}) {
+
+      # Possible to add
+      $p3calloc{$course}{"nstudents"}++;
+      $p3calloc{$course}{"students"}{$rollno} = 1;
+      $p3salloc{$rollno}{"courses"}{$course} = 1;
+      print("Late req succeeded:$rollno, $trtype, $course\n");
+    }
+    else {
+
+      print("Late req failed:Maxcap:$rollno, $trtype, $course\n");
+    }
+  }
+}
+
+sub do_late_changes
+{
+  foreach my $rec (@late_changes) {
+
+    my $rollno = $rec->{"rollno"};
+    my $trtype = $rec->{"trtype"};
+    my $clr = $rec->{"courselist"};
+    my @cl = ();
+
+    if ($trtype =~ "X") {
+
+      my $ar = $p3salloc{$rollno}{"courses"};
+      @cl = keys %$ar;
+      $trtype = "D";
+    }
+    else {
+
+      @cl = @$clr;
+    }
+    for my $c (@cl) {
+
+      execute_late_request($rollno, $trtype, $c);
+    }
+  }
 }
 
 sub main
@@ -1357,6 +1901,12 @@ sub main
       load_allocations("allocation-internal.txt");
       print_allocations;
 
+      # Do late changes
+      load_late_changes("post-p2-changes.txt");
+      print_late_changes;
+      do_late_changes;
+      print_allocations;
+
       # load choices given in p3
       load_p3choices("p3choices.txt");
       print_p3choices;
@@ -1364,6 +1914,7 @@ sub main
       add_drop_p3choices;
       print_remaining_p3choices;
       write_p3excel;
+      write_p3mailbodies;
 
       print_allocations;
     }
