@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: elec.pl,v 1.24 2006/09/20 17:48:27 a14562 Exp $
+# $Id: elec.pl,v 1.25 2007/02/07 18:14:30 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -671,7 +671,7 @@ sub write_excel
 	  $capsint->write($row, 5, $allocation{$c}{"nallotted"} || 0);
 	  $capsint->write($row, 6, $courses{$c}{"nocap"}
 			  ?"NA"
-			  :($courses{$c}{"cap"} - $allocation{$c}{"nallotted"}));
+			  :($courses{$c}{"cap"} - ($allocation{$c}{"nallotted"}||0)));
 
 	  $capsext->write($row, 0, $c);
 	  $capsext->write($row, 1, "-");
@@ -681,7 +681,7 @@ sub write_excel
 	  $capsext->write($row, 5, $allocation{$c}{"nallotted"} || 0);
 	  $capsext->write($row, 6, $courses{$c}{"nocap"}
 			  ?"NA"
-			  :($courses{$c}{"cap"} - $allocation{$c}{"nallotted"}));
+			  :($courses{$c}{"cap"} - ($allocation{$c}{"nallotted"}||0)));
 	}
 	++$row;
       }
@@ -909,7 +909,9 @@ sub write_choices_excel ($$$$)
     $sheet->write($row, $col++, "Credits", $formatbold);
     $sheet->write($row, $col++, "Seniority", $formatbold);
     $sheet->write($row, $col++, "CGPA", $formatbold);
+    $sheet->write($row, $col++, "Project", $formatbold);
     $sheet->write($row, $col++, "Asked", $formatbold);
+    $sheet->write($row, $col++, "Allowed", $formatbold) if $show_results;
     $sheet->write($row, $col++, "Allotted", $formatbold) if $show_results;
 
     for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
@@ -930,7 +932,9 @@ sub write_choices_excel ($$$$)
       $sheet->write($row, $col++, $students{$rollno}{'credits'});
       $sheet->write($row, $col++, $students{$rollno}{'senreason'});
       $sheet->write($row, $col++, $students{$rollno}{'cgpa'});
+      $sheet->write($row, $col++, defined($project_students{$rollno})?"Y":"N");
       $sheet->write($row, $col++, $choices{$rollno}{'ncourses'});
+      $sheet->write($row, $col++, $students{$rollno}{'nallowed'}) if $show_results;
       $sheet->write($row, $col++, $choices{$rollno}{'nallotted'}) if $show_results;
 
       for (my $priority = 1; $priority <= (keys %courses); ++$priority) {
@@ -1778,6 +1782,50 @@ sub write_p3mailbodies
   }
 }
 
+sub write_p3allocations($)
+{
+  my $filename = shift;
+
+  open OUT, ">$filename" or die "Can't open $filename: $!";
+
+  for my $rollno (sort keys %p3choices) {
+
+    print OUT "$rollno;";
+    for my $course (sort keys %{$p3choices{$rollno}{"courses"}}) {
+
+      print OUT "$course,";
+    }
+    print OUT ";";
+
+    print OUT "$p3choices{$rollno}{'trtype'};";
+    if ($p3choices{$rollno}{"trtype"} eq "A") {
+
+      print OUT ";$p3choices{$rollno}{'add'};";
+    }
+    elsif ($p3choices{$rollno}{"trtype"} eq "D") {
+
+      print OUT "$p3choices{$rollno}{'drop'};;";
+    }
+    else {
+
+      print OUT "$p3choices{$rollno}{'drop'};$p3choices{$rollno}{'add'};";
+    }
+    if ($p3choices{$rollno}{"status"} eq "N") {
+
+      print OUT "N;$p3choices{$rollno}{'reason'};";
+    }
+    else {
+
+      print OUT "$p3choices{$rollno}{'status'};;";
+    }
+    for my $course (sort keys %{$p3salloc{$rollno}{"courses"}}) {
+
+      print OUT "$course,";
+    }
+    print OUT "\n";
+  }
+}
+
 sub load_late_changes($)
 {
   my $file = shift;
@@ -1886,6 +1934,12 @@ sub execute_late_request
   }
 }
 
+sub clear_late_changes ()
+{
+    print "=== Cleared late changes ===\n";
+    @late_changes = ();
+}
+
 sub do_late_changes
 {
   foreach my $rec (@late_changes) {
@@ -1973,8 +2027,15 @@ sub main
 
       add_drop_p3choices;
       print_remaining_p3choices;
+
+      clear_late_changes;
+      load_late_changes("post-p3-changes.txt");
+      print_late_changes;
+      do_late_changes;
+
       write_p3excel;
       write_p3mailbodies;
+      write_p3allocations("p3-allocation.txt");
 
       print_allocations;
     }
