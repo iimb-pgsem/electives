@@ -1,5 +1,5 @@
 
-# $Id: Elec.pm,v 1.8 2006/08/30 17:50:06 a14562 Exp $
+# $Id: Elec.pm,v 1.9 2007/02/07 18:15:50 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -122,6 +122,7 @@ sub year_from_rollno($)
       $year = 2005;
     }
 
+    $year = $current_year if ($year =~ /..E./);
     $year =~ s/2021/2000/;
     $year =~ s/2104/2001/;
     $year =~ s/2204/2002/;
