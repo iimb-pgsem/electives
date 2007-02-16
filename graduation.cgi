@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: graduation.cgi,v 1.1 2007/02/15 20:07:05 a14562 Exp $
+# $Id: graduation.cgi,v 1.2 2007/02/16 19:44:39 a14562 Exp $
 
 # Copyright (c) 2006-07
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -109,8 +109,11 @@ sub print_profile_form()
     print "Name: $name", br;
     print br;
 
+    my %rec;
+    my $status = get_profile_from_db($rollno, \%rec);
+
     print
-        start_multipart_form(),
+        start_multipart_form(), hidden('rollno'), hidden('email'),
        
         "Information collected by PGSEM office:",
 
@@ -120,13 +123,13 @@ sub print_profile_form()
         "<table>",
         
         "<tr><td>", "IIMB course credits completed (*): ", "</td><td>",
-        textfield(-name=>'iccredits',  -size=>5, -maxlength=>3), "</td></tr>", 
+        textfield(-name=>'iccredits',  -size=>5, -maxlength=>3, -default=>$rec{'iccredits'}), "</td></tr>", 
 
         "<tr><td>", "IIMB project credits completed (*): ", "</td><td>",
-        textfield(-name=>'ipcredits',  -size=>5, -maxlength=>3), "</td></tr>",
+        textfield(-name=>'ipcredits',  -size=>5, -maxlength=>3, -default=>$rec{'ipcredits'}), "</td></tr>",
 
         "<tr><td>", "Exchange credits completed (*): ", "</td><td>", 
-        textfield(-name=>'excredits',  -size=>5, -maxlength=>3), "(0 if none)</td></tr>",
+        textfield(-name=>'excredits',  -size=>5, -maxlength=>3, -default=>$rec{'excredits'}), "(0 if none)</td></tr>",
 
         "</table>",
         
@@ -140,25 +143,25 @@ sub print_profile_form()
         "<table>",
         
         "<tr><td>", "Date of birth (dd-mm-yyyy) (*): ", "</td><td>",
-        textfield(-name=>'dob', -size=>20, -maxlength=>10), "</td></tr>",
+        textfield(-name=>'dob', -size=>20, -maxlength=>10, -default=>$rec{'dob'}), "</td></tr>",
 
         "<tr><td>", "Photo (upload file): ", "</td><td>",
         filefield(-name=>'photo', -size=>40, -maxlength=>10_000), "</td></tr>",
 
         "<tr><td>", "Contact E-Mail (*): ", "</td><td>",
-        textfield(-name=>'contactemail',  -size=>40, -maxlength=>50), "</td></tr>",
+        textfield(-name=>'contactemail',  -size=>40, -maxlength=>50, -default=>$rec{'contactemail'}), "</td></tr>",
 
         "<tr><td>", "Current work role: ", "</td><td>",
-        textfield(-name=>'currentworkrole',  -size=>40, -maxlength=>50), "</td></tr>",
+        textfield(-name=>'currentworkrole',  -size=>40, -maxlength=>50, -default=>$rec{'currentworkrole'}), "</td></tr>",
 
         "<tr><td>", "Current employer: ", "</td><td>",
-        textfield(-name=>'currentemployer',  -size=>40, -maxlength=>50), "</td></tr>",
+        textfield(-name=>'currentemployer',  -size=>40, -maxlength=>50, -default=>$rec{'currentemployer'}), "</td></tr>",
 
         "<tr><td>", "Future career plans: ", "</td><td>",
-        textfield(-name=>'careerplan',  -size=>40, -maxlength=>50), "</td></tr>",
+        textfield(-name=>'careerplan',  -size=>40, -maxlength=>50, -default=>$rec{'careerplan'}), "</td></tr>",
 
         "<tr><td>", "PGSEM memories / quotes / interesting experiences: ", "</td><td>",
-        textarea(-name=>'memories',  -rows=>10, -columns=>40),  "</td></tr>",
+        textarea(-name=>'memories',  -rows=>10, -columns=>40, -default=>$rec{'memories'}),  "</td></tr>",
         
         "</table>",
 
@@ -169,8 +172,115 @@ sub print_profile_form()
         local_end_html();
 }
 
+sub get_profile_from_db($$)
+{
+    my $rollno = shift;
+    my $rec = shift;
+
+    my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
+        {AutoCommit => 1, RaiseError => 1} );
+    
+    unless ($dbh) {
+      print br, "Error: unable to connect to database",
+        br, local_end_html();
+      return -1;
+    }
+    
+    my $status;
+    my $sth;
+    $sth = $dbh->prepare("SELECT iccredits, ipcredits, excredits, dob, " .
+    "photo, contactemail, currentworkrole, currentemployer, careerplan, memories " .
+    "FROM graduation WHERE rollno = '$rollno';");
+
+    $status = $sth->execute();
+    
+    unless ($status) {
+      print br, "Error: unable to read from database",
+        br, local_end_html();
+      $dbh->disconnect();
+      return -1;
+    }
+    
+    my ($iccredits, $ipcredits, $excredits);
+    my ($dob, $photo, $contactemail);
+    my ($currentworkrole, $currentemployer, $careerplan, $memories);
+
+    $sth->bind_columns(\$iccredits, \$ipcredits, \$excredits, 
+                       \$dob, \$photo, \$contactemail, 
+                       \$currentworkrole, \$currentemployer, \$careerplan, \$memories);
+
+    while ($sth->fetch()) {
+
+        $rec->{'iccredits'} = $iccredits;
+        $rec->{'ipcredits'} = $ipcredits;
+        $rec->{'excredits'} = $excredits;
+        $rec->{'dob'} = $dob;
+        $rec->{'photo'} = $photo;
+        $rec->{'contactemail'} = $contactemail;
+        $rec->{'currentworkrole'} = $currentworkrole;
+        $rec->{'currentemployer'} = $currentemployer;
+        $rec->{'careerplan'} = $careerplan;
+        $rec->{'memories'} = $memories;
+    }
+    
+    $sth->finish();
+    $dbh->disconnect();
+    
+    return 0; 
+}
+
+sub update_profile_in_db($$)
+{
+    my $rollno = shift;
+    my $rec = shift;
+
+    my $dbh = DBI->connect($datasource, $dblogin, $dbpassword,
+        {AutoCommit => 1, RaiseError => 1} );
+    
+    unless ($dbh) {
+      print br, "Error: unable to connect to database",
+        br, local_end_html();
+      return -1;
+    }
+    
+    my $status;
+    my $sth;
+
+    eval {
+      # $dbh->begin_work();
+      $status = $dbh->do("DELETE FROM graduation WHERE rollno = '$rollno';");
+      die "DELETE failed" unless $status;
+      $status = $dbh->do("INSERT INTO graduation VALUES (" .
+        "'$rollno', " .
+        "'$rec->{\"iccredits\"}', " .
+        "'$rec->{\"ipcredits\"}', " .
+        "'$rec->{\"excredits\"}', " .
+        "'$rec->{\"dob\"}', " .
+        "'$rec->{\"photo\"}', " .
+        "'$rec->{\"contactemail\"}', " .
+        "'$rec->{\"currentworkrole\"}', " .
+        "'$rec->{\"currentemployer\"}', " .
+        "'$rec->{\"careerplan\"}', " .
+        "'$rec->{\"memories\"}');");
+
+      die "INSERT failed" unless $status;
+      # $dbh->commit();
+    };
+
+    if ($@) {
+      # eval { $dbh->rollback() };
+      print br, "Error: unable to update database: $@",
+        br, local_end_html();
+      $dbh->disconnect();
+      return -1;
+    }
+
+    return 0; 
+}
+
 sub print_thanks
 {
+    my $rollno = param('rollno');
     my $iccredits = param('iccredits');
     my $ipcredits = param('ipcredits');
     my $excredits = param('excredits');
@@ -222,13 +332,15 @@ sub print_thanks
     } else {
 
 
+        # TODO debug printing -- to be removed later
+
         print "$iccredits", br;
         print "$ipcredits", br;
         print "$excredits", br;
         print "$excredits", br;
         print "$dob", br;
         print "$photo", br;
-        print uploadInfo($photo)->{'Content-Type'}, br;
+        $photo && print uploadInfo($photo)->{'Content-Type'}, br;
 
         {
             no strict;
@@ -244,6 +356,20 @@ sub print_thanks
         print "$currentemployer", br;
         print "$careerplan", br;
         print "$memories", br;
+
+        my %rec;
+
+        @rec{'iccredits', 'ipcredits', 'excredits',
+              'dob', 'photo', 'contactemail', 
+              'currentworkrole', 'currentemployer', 'careerplan', 'memories'} = 
+
+            ($iccredits, $ipcredits, $excredits,
+             $dob, $photo, $contactemail, 
+             $currentworkrole, $currentemployer, $careerplan, $memories);
+
+
+        my $status = update_profile_in_db($rollno, \%rec);
+        return if ($status == -1);
     }
 
     print local_end_html();
