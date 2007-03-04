@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: graduation.cgi,v 1.3 2007/03/04 11:25:49 a14562 Exp $
+# $Id: graduation.cgi,v 1.4 2007/03/04 11:26:22 a14562 Exp $
 
 # Copyright (c) 2006-07
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -125,29 +125,9 @@ sub print_profile_form()
     print
         start_multipart_form(), hidden('rollno'), hidden('email'),
        
-        "Information collected by PGSEM office:",
+        "Information being collected for the graduation book:",
 
         "<div style=\"background-color:#ffd; border:black solid 2px;",
-        "margin:1em;padding:5px\">",
-
-        "<table>",
-        
-        "<tr><td>", "IIMB course credits completed (*): ", "</td><td>",
-        textfield(-name=>'iccredits',  -size=>5, -maxlength=>3, -default=>$rec{'iccredits'}), "</td></tr>", 
-
-        "<tr><td>", "IIMB project credits completed (*): ", "</td><td>",
-        textfield(-name=>'ipcredits',  -size=>5, -maxlength=>3, -default=>$rec{'ipcredits'}), "</td></tr>",
-
-        "<tr><td>", "Exchange credits completed (*): ", "</td><td>", 
-        textfield(-name=>'excredits',  -size=>5, -maxlength=>3, -default=>$rec{'excredits'}), "(0 if none)</td></tr>",
-
-        "</table>",
-        
-        "</div>",
-
-        "Information collected for graduation book:",
-
-        "<div style=\"background-color:#ccffcc; border:black solid 2px;",
         "margin:1em;padding:5px\">",
 
         "<table>",
@@ -161,6 +141,21 @@ sub print_profile_form()
         "<tr><td>", "Contact E-Mail (*): ", "</td><td>",
         textfield(-name=>'contactemail',  -size=>40, -maxlength=>50, -default=>$rec{'contactemail'}), "</td></tr>",
 
+        "<tr><td>", "Mobile number: ", "</td><td>",
+        textfield(-name=>'mobilenumber',  -size=>40, -maxlength=>50, -default=>$rec{'mobilenumber'}), "</td></tr>",
+
+        "<tr><td>", "Educational qualifications (prior to PGSEM, separate by comma if more than one): ", "</td><td>",
+        textfield(-name=>'eduqual',  -size=>40, -maxlength=>50, -default=>$rec{'eduqual'}), "</td></tr>",
+
+        "<tr><td>", "Years of experience (as of now): ", "</td><td>",
+        textfield(-name=>'expyears',  -size=>5, -maxlength=>5, -default=>$rec{'expyears'}), "</td></tr>",
+
+        "<tr><td>", "PGSEM project topic (separate by comma if more than one): ", "</td><td>",
+        textfield(-name=>'projecttopic',  -size=>100, -maxlength=>400, -default=>$rec{'projecttopic'}), "</td></tr>",
+
+        "<tr><td>", "Publications, if any (separate by comma if more than one): ", "</td><td>",
+        textfield(-name=>'publications',  -size=>100, -maxlength=>400, -default=>$rec{'publications'}), "</td></tr>",
+
         "<tr><td>", "Current work role: ", "</td><td>",
         textfield(-name=>'currentworkrole',  -size=>40, -maxlength=>50, -default=>$rec{'currentworkrole'}), "</td></tr>",
 
@@ -169,6 +164,12 @@ sub print_profile_form()
 
         "<tr><td>", "Future career plans: ", "</td><td>",
         textfield(-name=>'careerplan',  -size=>40, -maxlength=>50, -default=>$rec{'careerplan'}), "</td></tr>",
+
+        "<tr><td>", "Areas of academic interest: ", "</td><td>",
+        textfield(-name=>'interest',  -size=>40, -maxlength=>100, -default=>$rec{'interest'}), "</td></tr>",
+
+        "<tr><td>", "Hobbies: ", "</td><td>",
+        textfield(-name=>'hobbies',  -size=>40, -maxlength=>100, -default=>$rec{'hobbies'}), "</td></tr>",
 
         "<tr><td>", "PGSEM memories / quotes / interesting experiences: ", "</td><td>",
         textarea(-name=>'memories',  -rows=>10, -columns=>40, -default=>$rec{'memories'}),  "</td></tr>",
@@ -198,8 +199,11 @@ sub get_profile_from_db($$)
     
     my $status;
     my $sth;
-    $sth = $dbh->prepare("SELECT iccredits, ipcredits, excredits, dob, " .
-    "phototype, photopath, contactemail, currentworkrole, currentemployer, careerplan, memories " .
+    $sth = $dbh->prepare("SELECT dob, phototype, photopath, " .
+			 "contactemail, mobilenumber, eduqual, " .
+			 "expyears, projecttopic, publications, " .
+			 "currentworkrole, currentemployer, " .
+			 "careerplan, interest, hobbies, memories " .
     "FROM graduation WHERE rollno = '$rollno';");
 
     $status = $sth->execute();
@@ -211,26 +215,32 @@ sub get_profile_from_db($$)
       return -1;
     }
     
-    my ($iccredits, $ipcredits, $excredits);
     my ($dob, $phototype, $photopath, $contactemail);
-    my ($currentworkrole, $currentemployer, $careerplan, $memories);
+    my ($mobilenumber, $eduqual, $expyears, $projecttopic, $publications);
+    my ($currentworkrole, $currentemployer, $careerplan, $interest, $hobbies, $memories);
 
-    $sth->bind_columns(\$iccredits, \$ipcredits, \$excredits, 
-                       \$dob, \$phototype, \$photopath, \$contactemail, 
-                       \$currentworkrole, \$currentemployer, \$careerplan, \$memories);
+    $sth->bind_columns(\$dob, \$phototype, \$photopath, \$contactemail, 
+		       \$mobilenumber, \$eduqual, \$expyears,
+		       \$projecttopic, \$publications,
+                       \$currentworkrole, \$currentemployer,
+		       \$careerplan, \$interest, \$hobbies, \$memories);
 
     while ($sth->fetch()) {
 
-        $rec->{'iccredits'} = $iccredits;
-        $rec->{'ipcredits'} = $ipcredits;
-        $rec->{'excredits'} = $excredits;
         $rec->{'dob'} = $dob;
         $rec->{'phototype'} = $phototype;
         $rec->{'photopath'} = $photopath;
         $rec->{'contactemail'} = $contactemail;
+        $rec->{'mobilenumber'} = $mobilenumber;
+        $rec->{'eduqual'} = $eduqual;
+        $rec->{'expyears'} = $expyears;
+        $rec->{'projecttopic'} = $projecttopic;
+        $rec->{'publications'} = $publications;
         $rec->{'currentworkrole'} = $currentworkrole;
         $rec->{'currentemployer'} = $currentemployer;
         $rec->{'careerplan'} = $careerplan;
+        $rec->{'interest'} = $interest;
+        $rec->{'hobbies'} = $hobbies;
         $rec->{'memories'} = $memories;
     }
     
@@ -263,16 +273,20 @@ sub update_profile_in_db($$)
       die "DELETE failed" unless $status;
       $status = $dbh->do("INSERT INTO graduation VALUES (" .
         "'$rollno', " .
-        "'$rec->{\"iccredits\"}', " .
-        "'$rec->{\"ipcredits\"}', " .
-        "'$rec->{\"excredits\"}', " .
         "'$rec->{\"dob\"}', " .
         "'$rec->{\"phototype\"}', " .
         "'$rec->{\"photopath\"}', " .
         "'$rec->{\"contactemail\"}', " .
+        "'$rec->{\"mobilenumber\"}', " .
+        "'$rec->{\"eduqual\"}', " .
+        "'$rec->{\"expyears\"}', " .
+        "'$rec->{\"projecttopic\"}', " .
+        "'$rec->{\"publications\"}', " .
         "'$rec->{\"currentworkrole\"}', " .
         "'$rec->{\"currentemployer\"}', " .
         "'$rec->{\"careerplan\"}', " .
+        "'$rec->{\"interest\"}', " .
+        "'$rec->{\"hobbies\"}', " .
         "'$rec->{\"memories\"}');");
 
       die "INSERT failed" unless $status;
@@ -316,35 +330,27 @@ sub save_image_file ($$)
 sub print_thanks
 {
     my $rollno = param('rollno');
-    my $iccredits = param('iccredits');
-    my $ipcredits = param('ipcredits');
-    my $excredits = param('excredits');
     my $dob = param('dob');
     my $photo = param('photo');
     my $phototype = ($photo ? uploadInfo{$photo}->{'Content-Type'} : "");
     my $photopath; # will be populated below
     my $contactemail = param('contactemail');
+    my $mobilenumber = param('mobilenumber');
+    my $eduqual = param('eduqual');
+    my $expyears = param('expyears');
+    my $projecttopic = param('projecttopic');
+    my $publications = param('publications');
     my $currentworkrole = param('currentworkrole');
     my $currentemployer = param('currentemployer');
     my $careerplan = param('careerplan');
+    my $interest = param('interest');
+    my $hobbies = param('hobbies');
     my $memories = param('memories');
 
     
     print header(), start_html($title), h3($title);
  
     my @error_messages;
-
-    unless ($iccredits =~ /\d+/) {
-        push @error_messages, "Invalid IIMB course credits", br;
-    }
-
-    unless ($ipcredits =~ /\d+/) {
-        push @error_messages, "Invalid IIMB project credits", br;
-    }
-
-    unless ($excredits =~ /\d+/) {
-        push @error_messages, "Invalid exchange credits", br;
-    }
 
     unless ($dob =~ /\d\d\d\d-\d\d-\d\d/) {
         push @error_messages, "Invalid date of birth", br;
@@ -371,10 +377,6 @@ sub print_thanks
         $photopath = save_image_file($rollno, $photo) if ($photo);
 
         if ($debugprint) {
-            print "$iccredits", br;
-            print "$ipcredits", br;
-            print "$excredits", br;
-            print "$excredits", br;
             print "$dob", br;
 
             unless ($photopath) {
@@ -384,21 +386,30 @@ sub print_thanks
             }
 
             print "$contactemail", br;
+            print "$mobilenumber", br;
+            print "$eduqual", br;
+            print "$expyears", br;
+            print "$projecttopic", br;
+            print "$publications", br;
             print "$currentworkrole", br;
             print "$currentemployer", br;
             print "$careerplan", br;
+            print "$interest", br;
+            print "$hobbies", br;
             print "$memories", br;
         }
 
         my %rec;
 
-        @rec{'iccredits', 'ipcredits', 'excredits',
-              'dob', 'phototype', 'photopath', 'contactemail', 
-              'currentworkrole', 'currentemployer', 'careerplan', 'memories'} = 
+        @rec{'dob', 'phototype', 'photopath', 'contactemail', 
+	       'mobilenumber', 'eduqual', 'expyears', 'projecttopic',
+		 'publications', 'currentworkrole', 'currentemployer',
+		   'careerplan', 'interest', 'hobbies', 'memories'} = 
 
-            ($iccredits, $ipcredits, $excredits,
-             $dob, $phototype, $photopath, $contactemail, 
-             $currentworkrole, $currentemployer, $careerplan, $memories);
+            ($dob, $phototype, $photopath, $contactemail,
+	     $mobilenumber, $eduqual, $expyears, $projecttopic,
+	     $publications, $currentworkrole, $currentemployer,
+	     $careerplan, $interest, $hobbies, $memories);
 
 
         my $status = update_profile_in_db($rollno, \%rec);
