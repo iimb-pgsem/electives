@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: graduation.cgi,v 1.2 2007/02/16 19:44:39 a14562 Exp $
+# $Id: graduation.cgi,v 1.3 2007/03/04 11:25:49 a14562 Exp $
 
 # Copyright (c) 2006-07
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -10,27 +10,30 @@
 use strict;
 
 use CGI qw(:standard);
-use CGI::Carp qw(fatalsToBrowser);
 use Net::SMTP;
 use Net::POP3;
 use FindBin;
 use DBI;
 use POSIX qw(strftime);
 
+# use Image::Magick;
+
 use ElecConfig;
 use Elec;
 
+$CGI::POST_MAX=1024 * 100;  # max 100K postsuse CGI::Carp qw(fatalsToBrowser);
+
+# begin global data
+my $debugprint = 0;
 my $config_dir = "$FindBin::Bin"; # at least for the present
-
 my $title = "PGSEM Graduation 2007";
-
 my $admin_rights = 0;
-
 my %states = (
               'default' => \&print_login_form,
               'Login' => \&print_profile_form,
               'Submit' => \&print_thanks
              );
+# end global data
 
 sub to_page ($)
 {
@@ -105,12 +108,19 @@ sub print_profile_form()
 
     my $name = $students{$rollno}->{'name'};
     
+    my %rec;
+    my $status = get_profile_from_db($rollno, \%rec);
+
+    if ($status == 0) {
+        if ($rec{'photopath'}) {
+            print "<img src=\"http://sankara.net/$rec{'photopath'}\">", br;
+            # TODO find a better way to do this
+        }
+    }
+
     print "Roll number: $rollno", br;
     print "Name: $name", br;
     print br;
-
-    my %rec;
-    my $status = get_profile_from_db($rollno, \%rec);
 
     print
         start_multipart_form(), hidden('rollno'), hidden('email'),
@@ -142,7 +152,7 @@ sub print_profile_form()
 
         "<table>",
         
-        "<tr><td>", "Date of birth (dd-mm-yyyy) (*): ", "</td><td>",
+        "<tr><td>", "Date of birth (yyyy-mm-dd) (*): ", "</td><td>",
         textfield(-name=>'dob', -size=>20, -maxlength=>10, -default=>$rec{'dob'}), "</td></tr>",
 
         "<tr><td>", "Photo (upload file): ", "</td><td>",
@@ -189,7 +199,7 @@ sub get_profile_from_db($$)
     my $status;
     my $sth;
     $sth = $dbh->prepare("SELECT iccredits, ipcredits, excredits, dob, " .
-    "photo, contactemail, currentworkrole, currentemployer, careerplan, memories " .
+    "phototype, photopath, contactemail, currentworkrole, currentemployer, careerplan, memories " .
     "FROM graduation WHERE rollno = '$rollno';");
 
     $status = $sth->execute();
@@ -202,11 +212,11 @@ sub get_profile_from_db($$)
     }
     
     my ($iccredits, $ipcredits, $excredits);
-    my ($dob, $photo, $contactemail);
+    my ($dob, $phototype, $photopath, $contactemail);
     my ($currentworkrole, $currentemployer, $careerplan, $memories);
 
     $sth->bind_columns(\$iccredits, \$ipcredits, \$excredits, 
-                       \$dob, \$photo, \$contactemail, 
+                       \$dob, \$phototype, \$photopath, \$contactemail, 
                        \$currentworkrole, \$currentemployer, \$careerplan, \$memories);
 
     while ($sth->fetch()) {
@@ -215,7 +225,8 @@ sub get_profile_from_db($$)
         $rec->{'ipcredits'} = $ipcredits;
         $rec->{'excredits'} = $excredits;
         $rec->{'dob'} = $dob;
-        $rec->{'photo'} = $photo;
+        $rec->{'phototype'} = $phototype;
+        $rec->{'photopath'} = $photopath;
         $rec->{'contactemail'} = $contactemail;
         $rec->{'currentworkrole'} = $currentworkrole;
         $rec->{'currentemployer'} = $currentemployer;
@@ -256,7 +267,8 @@ sub update_profile_in_db($$)
         "'$rec->{\"ipcredits\"}', " .
         "'$rec->{\"excredits\"}', " .
         "'$rec->{\"dob\"}', " .
-        "'$rec->{\"photo\"}', " .
+        "'$rec->{\"phototype\"}', " .
+        "'$rec->{\"photopath\"}', " .
         "'$rec->{\"contactemail\"}', " .
         "'$rec->{\"currentworkrole\"}', " .
         "'$rec->{\"currentemployer\"}', " .
@@ -278,6 +290,29 @@ sub update_profile_in_db($$)
     return 0; 
 }
 
+sub save_image_file ($$)
+{
+    my $rollno = shift;
+    my $photo = shift;
+
+    my $ext;
+    if ($photo =~ /(\.....?)$/) {
+        $ext = $1;
+    }
+
+    my $photopath = "pgsem/uploads/graduation/images/$rollno$ext";
+
+    open OUT, ">../htdocs/$photopath" or
+        return undef; # TODO better error reporting
+
+    my ($bytesread, $buffer);
+    while ($bytesread = read($photo, $buffer, 1024)) {
+        print OUT $buffer;
+    }
+
+    return $photopath;
+}
+
 sub print_thanks
 {
     my $rollno = param('rollno');
@@ -286,6 +321,8 @@ sub print_thanks
     my $excredits = param('excredits');
     my $dob = param('dob');
     my $photo = param('photo');
+    my $phototype = ($photo ? uploadInfo{$photo}->{'Content-Type'} : "");
+    my $photopath; # will be populated below
     my $contactemail = param('contactemail');
     my $currentworkrole = param('currentworkrole');
     my $currentemployer = param('currentemployer');
@@ -309,7 +346,7 @@ sub print_thanks
         push @error_messages, "Invalid exchange credits", br;
     }
 
-    unless ($dob =~ /\d\d\-\d\d-\d\d\d\d/) {
+    unless ($dob =~ /\d\d\d\d-\d\d-\d\d/) {
         push @error_messages, "Invalid date of birth", br;
     }
 
@@ -331,46 +368,44 @@ sub print_thanks
 
     } else {
 
+        $photopath = save_image_file($rollno, $photo) if ($photo);
 
-        # TODO debug printing -- to be removed later
+        if ($debugprint) {
+            print "$iccredits", br;
+            print "$ipcredits", br;
+            print "$excredits", br;
+            print "$excredits", br;
+            print "$dob", br;
 
-        print "$iccredits", br;
-        print "$ipcredits", br;
-        print "$excredits", br;
-        print "$excredits", br;
-        print "$dob", br;
-        print "$photo", br;
-        $photo && print uploadInfo($photo)->{'Content-Type'}, br;
-
-        {
-            no strict;
-
-            while (<$photo>) {
-                print;
-                print br;
+            unless ($photopath) {
+                print "No valid photo uploaded", br;
+            } else {
+                print "$phototype", br;
             }
-        }
 
-        print "$contactemail", br;
-        print "$currentworkrole", br;
-        print "$currentemployer", br;
-        print "$careerplan", br;
-        print "$memories", br;
+            print "$contactemail", br;
+            print "$currentworkrole", br;
+            print "$currentemployer", br;
+            print "$careerplan", br;
+            print "$memories", br;
+        }
 
         my %rec;
 
         @rec{'iccredits', 'ipcredits', 'excredits',
-              'dob', 'photo', 'contactemail', 
+              'dob', 'phototype', 'photopath', 'contactemail', 
               'currentworkrole', 'currentemployer', 'careerplan', 'memories'} = 
 
             ($iccredits, $ipcredits, $excredits,
-             $dob, $photo, $contactemail, 
+             $dob, $phototype, $photopath, $contactemail, 
              $currentworkrole, $currentemployer, $careerplan, $memories);
 
 
         my $status = update_profile_in_db($rollno, \%rec);
         return if ($status == -1);
     }
+
+    print br, "Data updated successfully.", br;
 
     print local_end_html();
   }
