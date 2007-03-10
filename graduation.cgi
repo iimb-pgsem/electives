@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: graduation.cgi,v 1.4 2007/03/04 11:26:22 a14562 Exp $
+# $Id: graduation.cgi,v 1.5 2007/03/10 07:58:56 a14562 Exp $
 
 # Copyright (c) 2006-07
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -272,22 +272,22 @@ sub update_profile_in_db($$)
       $status = $dbh->do("DELETE FROM graduation WHERE rollno = '$rollno';");
       die "DELETE failed" unless $status;
       $status = $dbh->do("INSERT INTO graduation VALUES (" .
-        "'$rollno', " .
-        "'$rec->{\"dob\"}', " .
-        "'$rec->{\"phototype\"}', " .
-        "'$rec->{\"photopath\"}', " .
-        "'$rec->{\"contactemail\"}', " .
-        "'$rec->{\"mobilenumber\"}', " .
-        "'$rec->{\"eduqual\"}', " .
-        "'$rec->{\"expyears\"}', " .
-        "'$rec->{\"projecttopic\"}', " .
-        "'$rec->{\"publications\"}', " .
-        "'$rec->{\"currentworkrole\"}', " .
-        "'$rec->{\"currentemployer\"}', " .
-        "'$rec->{\"careerplan\"}', " .
-        "'$rec->{\"interest\"}', " .
-        "'$rec->{\"hobbies\"}', " .
-        "'$rec->{\"memories\"}');");
+        "'\Q$rollno\E', " .
+        "'\Q$rec->{\"dob\"}\E', " .
+        "'\Q$rec->{\"phototype\"}\E', " .
+        "'\Q$rec->{\"photopath\"}\E', " .
+        "'\Q$rec->{\"contactemail\"}\E', " .
+        "'\Q$rec->{\"mobilenumber\"}\E', " .
+        "'\Q$rec->{\"eduqual\"}\E', " .
+        "'\Q$rec->{\"expyears\"}\E', " .
+        "'\Q$rec->{\"projecttopic\"}\E', " .
+        "'\Q$rec->{\"publications\"}\E', " .
+        "'\Q$rec->{\"currentworkrole\"}\E', " .
+        "'\Q$rec->{\"currentemployer\"}\E', " .
+        "'\Q$rec->{\"careerplan\"}\E', " .
+        "'\Q$rec->{\"interest\"}\E', " .
+        "'\Q$rec->{\"hobbies\"}\E', " .
+        "'\Q$rec->{\"memories\"}\E');");
 
       die "INSERT failed" unless $status;
       # $dbh->commit();
