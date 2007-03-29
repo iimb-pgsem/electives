@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: sendmails.pl,v 1.4 2006/09/05 19:52:26 a14562 Exp $
+# $Id: sendmails.pl,v 1.5 2007/03/29 13:05:21 a14562 Exp $
 
 use strict;
 
@@ -17,6 +17,8 @@ my $debug = 0;
 sub send_mail ($$$$$)
 {
     my ($from, $to, $subject, $body, $filename) = @_;
+
+    # $to = 'kvsankar@gmail.com';
 
     my $pop = Net::POP3->new('mail.sankara.net', Timeout=>60, Debug=>$debug);
 
@@ -36,11 +38,11 @@ sub send_mail ($$$$$)
             Type => 'TEXT',
             Data => $body);
 
-        $msg->attach(
-            Type => 'application/vnd.ms-excel',
-            Filename => $filename,
-            Path => $filename,
-            Disposition => 'attachment');
+#        $msg->attach(
+#            Type => 'application/vnd.ms-excel',
+#            Filename => $filename,
+#            Path => $filename,
+#            Disposition => 'attachment');
 
         MIME::Lite->send('smtp', "mail.sankara.net", 
                          Timeout=>60, Debug=>$debug) or
@@ -82,7 +84,7 @@ sub main
         eval {
             send_mail("PGSEM Electives <pgsemelectives\@sankara.net>",
                       "$name <$email>",
-                      "Course allotment results",
+                      "IIMB PGSEM Q2 2006-07 Phase 3 results", # TODO
                       join("", @lines),
                       "allocation.xls");
         }; 

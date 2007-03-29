@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: graduation.cgi,v 1.5 2007/03/10 07:58:56 a14562 Exp $
+# $Id: graduation.cgi,v 1.6 2007/03/29 13:05:21 a14562 Exp $
 
 # Copyright (c) 2006-07
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -21,7 +21,7 @@ use POSIX qw(strftime);
 use ElecConfig;
 use Elec;
 
-$CGI::POST_MAX=1024 * 100;  # max 100K postsuse CGI::Carp qw(fatalsToBrowser);
+# $CGI::POST_MAX=1024 * 100;  # max 100K postsuse CGI::Carp qw(fatalsToBrowser);
 
 # begin global data
 my $debugprint = 0;
