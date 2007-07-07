@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -Tw
 
 # $Id: summarytext.cgi,v 1.6 2006/08/24 17:48:14 a14562 Exp $
 
@@ -6,6 +6,10 @@
 # Sankaranarayanan K V <kvsankar@gmail.com>
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
+
+BEGIN {
+    unshift @INC, "/home/kvsankar/public_html/cgi-bin/";
+};
 
 use strict;
 
@@ -15,8 +19,9 @@ use FindBin;
 use DBI;
 use POSIX;
 
-my $config_dir = "$FindBin::Bin";
+# my $config_dir = "$FindBin::Bin";
 
+use ConfigDir;
 use ElecConfig;
 use Elec;
 
@@ -32,7 +37,7 @@ EOF
 
 sub main()
 {
-    read_config_info("config.txt");
+    read_config_info("$config_dir/config.txt");
     assign_config_info;
 
     unless (param('passcode')) {

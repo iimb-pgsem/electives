@@ -1,4 +1,8 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/perl -Tw 
+
+BEGIN {
+    unshift @INC, '/home/kvsankar/public_html/cgi-bin/';
+}
 
 use strict;
 
@@ -8,9 +12,10 @@ use FindBin;
 use DBI;
 use POSIX;
 
+use ConfigDir;
 use ElecConfig;
 
-my $config_dir = "$FindBin::Bin";
+# my $config_dir = "$FindBin::Bin";
 
 sub main()
 {
@@ -35,7 +40,7 @@ sub main()
     }
 
     print header(), start_html($title);
-    open IN, "<feedback.log" or die "Can't open feedback.log: $!";
+    open IN, "<$config_dir/feedback.log" or die "Can't open feedback.log: $!";
     my $pstate = 0;
     my $tstate = 0;
     while (<IN>) {

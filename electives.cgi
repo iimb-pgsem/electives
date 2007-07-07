@@ -7,6 +7,10 @@
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
 
+BEGIN {
+    unshift @INC, '/home/kvsankar/public_html/cgi-bin/';
+}
+
 use strict;
 
 use CGI qw(:standard);
@@ -17,11 +21,12 @@ use FindBin;
 use DBI;
 use POSIX qw(strftime);
 
+use ConfigDir;
 use ElecConfig;
 use Elec;
 use ElecUtils;
 
-my $config_dir = "$FindBin::Bin"; # at least for the present
+# my $config_dir = "$FindBin::Bin"; # at least for the present
 
 my $page;
 
@@ -71,7 +76,7 @@ sub load_allocations($)
     LINE: while (<IN>) {
         chomp;
         next if skip_line($_);
-        my ($rollno, $name, $email, $asked, $alloted, $allocationlist) = 
+        my ($rollno, $name, $email, $asked, $allowed, $alloted, $sen, $senreason, $allocationlist) = 
             split(/\s*\;\s*/, $_) unless skip_line($_); 
 
         $allocationlist = undef if (defined($allocationlist) && ($allocationlist eq ''));
@@ -145,21 +150,37 @@ sub print_login_page()
 
 <div style="background-color:#ffd; border:black solid
 2px;margin:1em;padding:5px">This page is to be used by the IIMB PGSEM
-students for applying for elective courses (<b>Phase
+students for applying for elective courses
 EOF
 
-    print " $phase";
-    print <<'EOF';
+    if ($phase =~ /2R/) {
+
+      print <<'EOF';
+. You can view your phase 2 results by logging in here.</div>
+EOF
+
+    }
+    elsif ($phase =~ /3R/) {
+
+      print <<'EOF';
+. You can view your phase 3 results by logging in here.</div>
+EOF
+
+    }
+    else {
+
+      print " (<b>Phase $phase";
+      print <<'EOF';
 </b>) for the quarter starting
 EOF
-
-    print " $quarter_starts_str.";
-    print <<'EOF';
+      
+      print " $quarter_starts_str.";
+      print <<'EOF';
 <br>Submission deadline is
 EOF
 
-    print " $deadline_str.";
-    print <<'EOF';
+      print " $deadline_str.";
+      print <<'EOF';
 <br><br>
 
 <font color='red'>Submissions after the deadline will only be considered 
@@ -167,22 +188,22 @@ subject to the PGSEM Chairperson's approval.</font><br><br>
 
 EOF
 
-    if ($phase == 1) {
+      if ($phase =~ /1/) {
 
         print <<'EOF';
 <font color='red'>As per PGSEM rules, you will be allowed to participate in Phase 2 
 <i>only if</i> you submit your Phase 1 preferences.</font><br><br>
 EOF
-    }
-    elsif ($phase == 2) {
+      }
+      elsif ($phase =~ /2/) {
         print <<'EOF';
 <font color='red'>As per PGSEM rules, if you have not participated in phase 1, your
 choices for phase 2 will be considered after considering the choices
 of all other students.</font><br><br>
 EOF
-    }
+      }
 
-    print <<"EOF";
+      print <<"EOF";
 
 The official rules and processes are provided in the 
 <a href=\"$moodle_url">IIMB moodle site</a>.
@@ -212,7 +233,7 @@ this passcode and pressing the "Login" button. You will be sent to the
 elective choice page.</li><br>
 EOF
 
-    if (($phase == 1) || ($phase == 2)) {
+      if (($phase =~ /1/) || ($phase =~ /2/)) {
         print <<'EOF';
         <li>Choose: In the elective choice page,
 select the number of elective courses you wish to do, then give your choices as
@@ -221,27 +242,34 @@ choices you want to take. This will acknowledge the choices you
 selected by listing them and will also send you a mail about the
 elective courses you chose. In Phase 1 you can give a maximum of 3 choices only. 
 EOF
-    } elsif ($phase == 3) {
+      } elsif ($phase =~ /3/) {
         print <<'EOF';
         <li>Drop/Add/Swap: In the elective choice page,
 select the elective course to be addded/dropped/swapped and submit
 using the appropriate button.
 EOF
-    }
+      }
 
-    print <<'EOF';
+      print <<'EOF';
  </li><br></ol> </div>
 EOF
+      if ($phase =~ /2A/) {
+          print "<br><b>Note for Phase 2A</b>:<br>\n";
+          print "<ol>\n";
+          print "<li>The current phase (Phase 2A) is meant for seniors only. If you are a junior, please note that your choices will not be considered as part of phase 2A even if you submit them\n";
+          print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
+          print "</ol>"
+      }
 
-
-    if ($phase == 2) {
-        print "<br><b>Note for Phase 2</b>:<br>\n";
-        print "<ol>\n";
-        print "<li>The current phase (Phase 2B) is meant for juniors and those who missed Phase 1 or 2A.\n";
-        print "If you have been allotted courses based on Phase 2A, you can't access Phase 2B.</li>\n";
-        print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
-        print "</ol>"
-    }
+      if ($phase =~ /2B/) {
+          print "<br><b>Note for Phase 2B</b>:<br>\n";
+          print "<ol>\n";
+          print "<li>The current phase (Phase 2B) is meant for juniors and those who missed Phase 1 or 2A.\n";
+          print "If you have been allotted courses based on Phase 2A, you can't access Phase 2B.</li>\n";
+          print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
+          print "</ol>"
+      }
+  }
 
     print
         start_form(),
@@ -600,6 +628,276 @@ sub load_p2a_students($)
     close IN;
 }
 
+my %allocation;
+
+sub load_p2_allocation ($)
+{
+    my $filename = shift;
+
+    open IN, "<$filename" or die "Can't open $filename: $!";
+
+    while (<IN>) {
+        chomp;
+        
+        my ($rollno, $name, $email, $nasked, $nallowed, 
+	    $nallotted, $seniority, $senreason, $ca) = 
+          split(/\s*;\s*/);
+
+        my @calist = split(/,/, $ca);
+
+        my @clist;
+        my %alloc;
+
+        foreach my $token (@calist) {
+            my ($course, $status) = split(/=/, $token);
+            push @clist, $course;
+            $alloc{$course} = $status;
+        }
+
+        $allocation{$rollno}{'name'} = $name;
+        $allocation{$rollno}{'email'} = $email;
+        $allocation{$rollno}{'nasked'} = $nasked;
+        $allocation{$rollno}{'nallowed'} = $nallowed;
+        $allocation{$rollno}{'nallotted'} = $nallotted;
+        $allocation{$rollno}{'seniority'} = $seniority;
+        $allocation{$rollno}{'senreason'} = $senreason;
+        $allocation{$rollno}{'clist'} = \@clist;
+        $allocation{$rollno}{'alloc'} = \%alloc;
+    }
+
+    close IN;
+}
+
+my %senreasons = 
+  (
+   "NO:P1" => "Missed phase 1",
+   "NO:CRED" => "Completion of credits",
+   "NO:P2A" => "Missed phase 2A",
+   "NO:LATE" => "Late submission"
+  );
+
+sub print_p2_result($)
+{
+  my $rollno = shift;
+  if (!defined($allocation{$rollno})) {
+
+    print "No courses have been allocated to you as you did not participate in phase 2.<br/>\n";
+    return;
+  }
+  print "Here are the results of your phase 2 course allocations.<br/>\n";
+
+  print "Roll number: $rollno<br/>\n";
+  print "Name: $allocation{$rollno}{'name'}<br/>\n";
+  print "E-Mail: $allocation{$rollno}{'email'}<br/>\n";
+  print "Seniority: "
+    . (($allocation{$rollno}{'seniority'} ne $allocation{$rollno}{'senreason'})
+       ? "None ($senreasons{$allocation{$rollno}{'senreason'}})"
+       : "$allocation{$rollno}{'seniority'}")
+      . "<br/>\n";
+  print "<br/>";
+  print "#Courses asked: $allocation{$rollno}{'nasked'}<br/>\n";
+  print "#Courses max allowed: $allocation{$rollno}{'nallowed'}<br/>\n";
+  print "#Courses allotted: $allocation{$rollno}{'nallotted'}<br/>\n";
+  print "<br/>\n";
+
+  print '<h3>Allocation results</h3><table border="2">';
+  print "<tr><th>Preference #</th><th>Course</th><th>Status</th>\n";
+  my $count = 1;
+  foreach my $course (@{$allocation{$rollno}{'clist'}}) {
+
+    print "<tr>";
+    my $status = $allocation{$rollno}{'alloc'}->{$course};
+    
+    print "<td>$count</td><td>",
+      $allocation{$rollno}{'clist'}->[$count-1], "</td><td>",
+	$status;
+
+    if ($status =~ /Allotted/) {
+      print " (", $courses{$course}{'slot'}, ")";
+      print "</td></tr>\n"
+    }
+    
+    ++$count;
+  }
+  print "</table>";
+  print <<'EOF';
+<br/>
+For any clarifications regarding the allocation, 
+please get in touch with the PGSEM office.<br/>
+
+We would be grateful if you can provide us feedback
+on the the preferences submission, allocation, and 
+communication processes at our <a href="http://sankara.net/cgi-bin/feedback.cgi">feedback page</a>.
+
+
+<h3>Legend for status</h3>
+<dl>
+<dt>Allotted</dt><dd>Course is allotted.</dd>
+<dt>Allowed:n</dt>
+<dd>
+Course is NOT allotted. Reasons coud be either of<br/>
+<ol>
+<li>CGPA <  2.75, doing project course, 3 requested</li>
+<li>CGPA <  2.75, not doing project course, 4 requested</li>
+<li>CGPA >= 2.75, doing project course, 4 requested</li>
+</ol>
+</dd>
+<dt>Capped</dt>
+<dd>Course NOT allotted. Reasons can be either of<br/>
+<ol>
+<li>Course capped due to instructor set cap.</li>
+<li>Course capped due to class capacity constraints.</li>
+</ol>
+</dd>
+<dt>Complete</dt><dd>Course NOT allotted.<br/>
+Number of courses asked for has been allotted.</dd>
+<dt>Dropped</dt><dd>Course NOT allotted.<br\>
+Course has been dropped.</dd>
+<dt>SC:XXX</dt><dd>Course NOT allotted.<br/>
+There is a schedule conflict with the course XXX requested
+by you at a higher preference and XXX has been allotted.</dd>
+</dl>
+EOF
+
+}
+
+my %p3allocation;
+
+sub load_p3_allocation ($)
+{
+    my $filename = shift;
+
+    open IN, "<$filename" or die "Can't open $filename: $!";
+
+    while (<IN>) {
+        chomp;
+        
+        my ($rollno, $oldcourses, $trtype, $drop, $add,
+	    $status, $reason, $newcourses) = 
+          split(/\s*;\s*/);
+
+        my @oldclist = split(/,/, $oldcourses);
+        my @newclist = split(/,/, $newcourses);
+
+        $p3allocation{$rollno}{'oldcourses'} = \@oldclist;
+        $p3allocation{$rollno}{'trtype'} = $trtype;
+        $p3allocation{$rollno}{'drop'} = $drop;
+        $p3allocation{$rollno}{'add'} = $add;
+        $p3allocation{$rollno}{'status'} = $status;
+        $p3allocation{$rollno}{'reason'} = $reason;
+        $p3allocation{$rollno}{'newcourses'} = \@newclist;
+    }
+
+    close IN;
+}
+
+sub print_p3_result($)
+{
+  my $rollno = shift;
+  if (!defined($p3allocation{$rollno})) {
+
+    print "There is no change in your allocations in phase 3 as you did not participate in this phase.<br/>\n";
+    return;
+  }
+  print "Here are the results of your phase 3 allocation change request.<br/>\n";
+
+  print "Roll number: $rollno<br/>\n";
+  print "Name: $students{$rollno}{'name'}<br/>\n";
+  print "E-Mail: $students{$rollno}{'email'}<br/>\n";
+  print "<br/>";
+
+  my $ncourses = scalar(@{$p3allocation{$rollno}{"oldcourses"}});
+  if ($ncourses > 0) {
+
+    if ($ncourses == 1) {
+
+      print "Your only course before phase 3 was as follows:<br/>\n";
+    }
+    else {
+
+      print "Your $ncourses courses before phase 3 were as follows:<br/>\n";
+    }
+    print "<ol>\n";
+    for my $course (sort @{$p3allocation{$rollno}{"oldcourses"}}) {
+
+      print "<li>$course - " . $courses{$course}{"name"} . "</li>\n";
+    }
+    print "</ol>\n";
+  }
+  else {
+
+    print "Your had no courses before phase 3.<br/>\n";
+  }
+
+  print "<br/>Your request was to ";
+  if ($p3allocation{$rollno}{"trtype"} eq "A") {
+
+    print "add course " . $p3allocation{$rollno}{"add"} . ".<br/><br/>\n";
+  }
+  elsif ($p3allocation{$rollno}{"trtype"} eq "D") {
+
+    print "drop course " . $p3allocation{$rollno}{"drop"} . ".<br/><br/>\n";
+  }
+  else {
+
+    print "swap course " . $p3allocation{$rollno}{"drop"} . " with " . $p3allocation{$rollno}{"add"} . ".<br/><br/>\n";
+  }
+
+  if ($p3allocation{$rollno}{"status"} eq "D") {
+
+    print "This request was successful.<br/><br/>\n";
+  }
+  elsif ($p3allocation{$rollno}{"status"} eq "N") {
+
+    print "This request was not successful as ";
+    if ($p3allocation{$rollno}{"reason"} eq "Capped") {
+
+      print "the course you wished to add (" . $p3allocation{$rollno}{"add"} . ") is capped.<br/><br/>\n";
+    }
+    elsif ($p3allocation{$rollno}{"reason"} eq "Quorum") {
+
+      print "the course you wished to drop (" . $p3allocation{$rollno}{"drop"} . ") will fall short of minimum requirements.<br/><br/>\n";
+    }
+    elsif ($p3allocation{$rollno}{"reason"} =~ "Allowed:") {
+
+      print "you have already taken maximum number of courses and are not allowed to take one more.<br/><br/>\n";
+    }
+    else {
+
+      print "it happens.<br/><br/>\n";
+    }
+  }
+  else {
+
+    print "This request is still pending, please contact PGSEM office.<br/><br/>\n";
+  }
+
+  $ncourses = scalar(@{$p3allocation{$rollno}{"newcourses"}});
+  if ($ncourses > 0) {
+
+    if ($ncourses == 1) {
+
+      print "Your only course after phase 3 is as follows:<br/>\n";
+    }
+    else {
+
+      print "Your $ncourses courses after phase 3 are as follows:<br/>\n";
+    }
+    print "<ol>\n";
+    for my $course (sort @{$p3allocation{$rollno}{"newcourses"}}) {
+
+      print "<li>$course - " . $courses{$course}{"name"} . "</li>\n";
+    }
+    print "</ol>\n";
+  }
+  else {
+
+    print "Your have no courses after phase 3.<br/>\n";
+  }
+
+  print "<br/>For any clarifications regarding the allocation, please get in touch with the PGSEM office.<br/>\n";
+}
+ 
 sub print_electives_page ()
 {
     print header(), start_html($title), h3($title);
@@ -637,17 +935,37 @@ sub print_electives_page ()
 
 
     my $errors = load_students("$config_dir/students.txt");
-    
-    load_p2a_students("$config_dir/p2a-students.txt");
 
-    if (defined($p2a_students{$rollno})) {
+    if ($phase =~ /2R/) {
+
+      load_courses("$config_dir/courses-internal.txt", 1);
+      load_p2_allocation("$config_dir/allocation-internal.txt");
+      print_p2_result($rollno);
+      print local_end_html();
+      return;
+    }
+    if ($phase =~ /3R/) {
+
+      load_courses("$config_dir/courses-internal.txt", 1);
+      load_p3_allocation("$config_dir/p3-allocation.txt");
+      print_p3_result($rollno);
+      print local_end_html();
+      return;
+    }
+    if ($phase =~ /2B/) {
+
+      load_p2a_students("$config_dir/p2a-students.txt");
+
+      if (defined($p2a_students{$rollno})) {
 
         print "You have been allotted courses based on Phase 2A.<br>\n";
         print "Hence you cannot participate in the current phase (Phase 2B).<br>\n";
         print local_end_html();
         return;
+      }
     }
 
+    load_courses("$config_dir/courses.txt", 0);
     my $site = $students{$rollno}{'site'};
 
     my %courses_for_student;
@@ -677,7 +995,6 @@ sub print_electives_page ()
     print "<tr><td>Site:</td><td>$displayed_site</td></tr>";
     print "</table>\n";
    
-    load_courses("$config_dir/courses.txt", 0);
     
     print
       start_form(),
@@ -690,7 +1007,7 @@ sub print_electives_page ()
     print "<font size=\"-1\"><table border='1'>\n";
     
     print "<tr>\n";
-    print "<td><b>Slot</b></td>\n" unless ($phase eq '1');
+    print "<td><b>Slot</b></td>\n" unless ($phase =~ /1/);
     print "<td><b>Code</b></td>\n";
     print "<td><b>Name</b></td>\n";
     print "<td><b>Instructor</b></td>\n";
@@ -712,7 +1029,7 @@ sub print_electives_page ()
       my $sites = $courses{$course}{"site"};
       my $sites_displayed = '';
       if ($courses{$course}{"distributed"}) {
-          $sites_displayed = ($phase == 1 ? "Potentially " : "") . "Distributed";
+          $sites_displayed = ($phase =~ /1/ ? "Potentially " : "") . "Distributed";
       } elsif ($sites eq 'B') {
         $sites_displayed = 'Bangalore';
       } elsif ($sites eq 'C') {
@@ -735,7 +1052,7 @@ sub print_electives_page ()
 
       print "<tr bgcolor='$bgcolor'>\n";
     
-      print "<td>$courses{$course}{'slot'}</td>" unless ($phase eq '1');
+      print "<td>$courses{$course}{'slot'}</td>" unless ($phase =~ /1/);
       print "<td>$course</td>";
       print "<td>$courses{$course}{'name'}</td>";
       print "<td>$courses{$course}{'instructor'}</td>";
@@ -745,7 +1062,7 @@ sub print_electives_page ()
       print "<td>", $student_can_take_course ? "Yes" : "No", "</td>";
    
       my $menuitem = "$course:" . 
-        (($phase eq 1) ? ":" : "Slot $courses{$course}{'slot'}:") . 
+        (($phase =~ /1/) ? ":" : "Slot $courses{$course}{'slot'}:") . 
         "$courses{$course}{'name'}:" . "$sites_displayed";
 
       if ($student_can_take_course) {
@@ -760,8 +1077,18 @@ sub print_electives_page ()
     print br;
 
 
-    if ($phase == 2) {
-        print "<br><b>Note for Phase 2</b>:<br>\n";
+
+
+    if ($phase =~ /2A/) {
+        print "<br><b>Note for Phase 2A</b>:<br>\n";
+        print "<ol>\n";
+        print "<li>The current phase (Phase 2A) is meant for seniors only. If you are a junior, please note that your choices will not be considered as part of phase 2A even if you submit them\n";
+        print "<li>Please remember to indicate whether you are doing a project course in Phase 2.</li><br>";
+        print "</ol>"
+    }
+
+    if ($phase =~ /2B/) {
+        print "<br><b>Note for Phase 2B</b>:<br>\n";
         print "<ol>\n";
         print "<li>The current phase (Phase 2B) is meant for juniors and those who missed Phase 1 or 2A.\n";
         print "If you have been allotted courses based on Phase 2A, you can't access Phase 2B.</li>\n";
@@ -798,7 +1125,7 @@ sub print_electives_page ()
 
     for (my $i = 0; $i < scalar(@courselist)-1; ++$i) {
 
-      last if (($phase == 1) && ($i == 3)); 
+      last if (($phase =~ /1/) && ($i == 3)); 
       # only 3 choices for Phase 1 as per PGSEM office
 
       my $pref = $i + 1;
@@ -895,7 +1222,7 @@ sub menulist_from_courselist
     my $sites = $courses{$course}{"site"};
     my $sites_displayed = '';
     if ($courses{$course}{"distributed"}) {
-        $sites_displayed = ($phase == 1 ? "Potentially " : "") . "Distributed";
+        $sites_displayed = ($phase =~ /1/ ? "Potentially " : "") . "Distributed";
     } elsif ($sites eq 'B') {
       $sites_displayed = 'Bangalore';
     } elsif ($sites eq 'C') {
@@ -914,7 +1241,7 @@ sub menulist_from_courselist
     }
   
     my $menuitem = "$course:" . 
-      (($phase eq 1) ? ":" : "Slot $courses{$course}{'slot'}:") . 
+      (($phase =~ /1/) ? ":" : "Slot $courses{$course}{'slot'}:") . 
       "$courses{$course}{'name'}:" . "$sites_displayed";
 
     if ($student_can_take_course) {
@@ -1068,7 +1395,7 @@ sub log_db ($)
     my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
 
     # first update a log file in text format for redundancy 
-    open IN, ">>electives.log";
+    open IN, ">>$config_dir/electives.log";
     print IN "$timestr: $msg\n";
     close IN;
 
@@ -1325,7 +1652,7 @@ sub print_p2ack_page ()
       
     for (my $i = 0; $i < scalar(keys %courses_for_student); ++$i) {
 
-      last if (($phase == 1) && ($i == 3));
+      last if (($phase =~ /1/) && ($i == 3));
       # max 3 preferences for Phase 1 as per PGSEM office
 
       my $pref = $i + 1;
@@ -1369,7 +1696,7 @@ sub print_p2ack_page ()
     }
 
     if ($ncourses > @choices) {
-        unless (($phase == 1) && ($ncourses == 4) && (@choices == 3)) {
+        unless (($phase =~ /1/) && ($ncourses == 4) && (@choices == 3)) {
              
         print br, "Error: number of courses ($ncourses) is greater than ",
             "the number of preferences (", scalar(@choices), ") given.";
@@ -1482,6 +1809,8 @@ sub print_p3ack_page ()
 
         my $rv = delete_changes_from_db($rollno);
         return if ($rv != 0);
+
+        log_db("OK: changes: rollno=$rollno, request=cancel");
 
         print "Your previous request has been cancelled.", br;
         print local_end_html;
@@ -1613,9 +1942,16 @@ sub main()
 
     $page = param(".state") || "default";
 
-    if ($phase == 1) {
+    if ($phase =~ /0/) {
+        print header(), start_html("PGSEM Electives Submission");
+        print "The electives submission site is not enabled at this point in time.", br;
+        print local_end_html;
+        return;
+    }
+
+    if ($phase =~ /1/) {
         %states = %p1states;
-    } elsif ($phase == 2) {
+    } elsif ($phase =~ /2/ || $phase =~ /3R/) {
         %states = %p2states;
     } else {
         %states = %p3states;

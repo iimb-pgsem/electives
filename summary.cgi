@@ -1,11 +1,15 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -Tw
 
-# $Id: summary.cgi,v 1.6 2006/08/24 17:21:52 a14562 Exp $
+# $Id: summary.cgi,v 1.4 2006/05/17 15:30:07 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
+
+BEGIN {
+    unshift @INC, "/home/kvsankar/public_html/cgi-bin/";
+};
 
 use strict;
 
@@ -15,10 +19,11 @@ use FindBin;
 use DBI;
 use POSIX;
 
+use ConfigDir;
 use ElecConfig;
 use Elec;
 
-my $config_dir = "$FindBin::Bin"; # at least for the present
+# my $config_dir = "$FindBin::Bin"; # at least for the present
 
 sub local_end_html()
 {

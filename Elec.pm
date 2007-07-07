@@ -1,5 +1,4 @@
-
-# $Id: Elec.pm,v 1.5 2006/08/21 07:20:43 a14562 Exp $
+# $Id: Elec.pm,v 1.4 2006/08/13 11:51:17 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranaryananan K V <kvsankar@gmail.com>
@@ -124,7 +123,7 @@ sub seniority_from_rollno($)
     
     my $year = year_from_rollno($rollno);
     my $credits = $students{$rollno}{"credits"};
-    if ($credits < $credits_pass && ($phase != 2 || defined($p1_students{$rollno}))) {
+    if ($credits < $credits_pass && ($phase ne "2" || defined($p1_students{$rollno}))) {
         return $year;
     } else {
         return $current_year;
@@ -386,8 +385,7 @@ sub load_choices($)
             $student_courses{$course} = 1;
         }
 
-        if ($ncourses > (keys %student_courses)
-	   && (($phase != 1) || ($ncourses != 4) || ((keys %student_courses) != 3))) {
+        if ($ncourses > (keys %student_courses)) {
             err_print("error:$file:$.: #choices < #courses");
             next LINE;
         }

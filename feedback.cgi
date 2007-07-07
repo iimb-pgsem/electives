@@ -1,11 +1,15 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -Tw
 
-# $Id: feedback.cgi,v 1.2 2006/08/13 14:37:05 a14562 Exp $
+# $Id: feedback.cgi,v 1.1 2006/02/12 10:51:34 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
 # Abhay Ghaisas <abhay.ghaisas@gmail.com>
 # All rights reserved.
+
+BEGIN {
+    unshift @INC, '/home/kvsankar/public_html/cgi-bin/';
+}
 
 use strict;
 
@@ -16,6 +20,7 @@ use Net::POP3;
 use FindBin;
 use DBI;
 use POSIX qw(strftime);
+use ConfigDir;
 
 my $title = "PGSEM Electives Submission - Feedback";
 
@@ -88,7 +93,7 @@ sub print_thanks
    
     my $timestr = strftime("%Y-%m-%d %H-%M-%S", localtime);
 
-    open IN, ">>feedback.log";
+    open IN, ">>${config_dir}/feedback.log";
     print IN "<record>\n";
     print IN "Time: $timestr\n";
     print IN "Name: $name\n";

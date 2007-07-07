@@ -1,6 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -Tw
 
-# $Id: project.cgi,v 1.1 2006/08/24 17:46:58 a14562 Exp $
+# $Id: project.cgi,v 1.5 2006/08/13 14:37:05 a14562 Exp $
 
 # Copyright (c) 2006
 # Sankaranarayanan K V <kvsankar@gmail.com>
@@ -15,8 +15,9 @@ use FindBin;
 use DBI;
 use POSIX;
 
-my $config_dir = "$FindBin::Bin";
+# my $config_dir = "$FindBin::Bin";
 
+use ConfigDir;
 use ElecConfig;
 use Elec;
 
@@ -32,7 +33,7 @@ EOF
 
 sub main()
 {
-    read_config_info("config.txt");
+    read_config_info("$config_dir/config.txt");
     assign_config_info;
 
     unless (param('passcode')) {
