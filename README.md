@@ -1,11 +1,11 @@
 # PGSEM Electives Allocation System
 
-[![CI](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml/badge.svg)](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml)
-![Language](https://img.shields.io/github/languages/top/kvsankar/iimb-pgsem-electives)
-[![License: MIT](https://img.shields.io/github/license/kvsankar/iimb-pgsem-electives)](LICENSE)
-![Repo Size](https://img.shields.io/github/repo-size/kvsankar/iimb-pgsem-electives)
-![Last Commit](https://img.shields.io/github/last-commit/kvsankar/iimb-pgsem-electives)
-![GitHub Stars](https://img.shields.io/github/stars/kvsankar/iimb-pgsem-electives)
+[![CI](https://github.com/iimb-pgsem/electives/actions/workflows/ci.yml/badge.svg)](https://github.com/iimb-pgsem/electives/actions/workflows/ci.yml)
+![Language](https://img.shields.io/github/languages/top/iimb-pgsem/electives)
+[![License: MIT](https://img.shields.io/github/license/iimb-pgsem/electives)](LICENSE)
+![Repo Size](https://img.shields.io/github/repo-size/iimb-pgsem/electives)
+![Last Commit](https://img.shields.io/github/last-commit/iimb-pgsem/electives)
+![GitHub Stars](https://img.shields.io/github/stars/iimb-pgsem/electives)
 
 A course elective preference collection and allocation system built for
 the Post-Graduate Program in Software Enterprise Management (PGSEM) at
