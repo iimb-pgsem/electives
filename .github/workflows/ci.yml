@@ -41,9 +41,9 @@ jobs:
         run: |
           echo "=== Checking output ==="
 
-          # All 21 students should appear in allocation
-          count=$(grep -c "^20[0-9]\{5\}$" output.txt)
-          echo "Students in ranklist: $count"
+          # All 21 students should appear in allocation-by-student output
+          count=$(sed -n '/=== Allocation by student ===/,$ p' output.txt | grep -c "^20[0-9]\{5\}$")
+          echo "Students in allocation: $count"
           [ "$count" -eq 21 ] || { echo "FAIL: expected 21 students, got $count"; exit 1; }
 
           # Allocation by course section should exist
