@@ -202,6 +202,39 @@ installed.
 3. Deploy CGI scripts to a web server with CGI support
 4. Access `electives.cgi` through the browser
 
+## Testing
+
+The project includes a CI pipeline ([GitHub Actions](.github/workflows/ci.yml))
+and a complete set of synthetic test fixtures in `test/`.
+
+### Test fixtures
+
+The `test/` directory contains everything needed to run the allocation
+engine without a database: 10 courses, 21 synthetic students across
+3 batches (2003–2005), and realistic preference data. The data is
+designed to exercise:
+
+- **Seniority ranking**: 2003 batch students are allocated before 2004,
+  then 2005
+- **Seniority loss**: student 2003106 has >=93 credits and loses
+  seniority privilege
+- **Schedule conflict detection**: courses sharing the same time slot
+  cannot both be allocated to one student
+- **CGPA-based tie-breaking**: within the same seniority and priority
+- **Project student handling**: project students get one fewer elective
+  slot
+
+### CI pipeline
+
+On every push and pull request, CI runs three checks:
+
+1. **Syntax check** — `perl -c` on all `.pl`, `.pm`, and `.cgi` files
+2. **Allocation test** — runs the engine against test fixtures and
+   verifies allotments, course/student output sections, seniority
+   ordering, schedule conflict detection, and Excel workbook generation
+3. **PII scan** — ensures no student email addresses or data files are
+   present in the repository
+
 ## Repository Structure
 
 ```
@@ -222,11 +255,19 @@ installed.
 │   ├── p2a-students.txt        # Phase 2A participant list
 │   ├── p2-students.txt         # Phase 2 participant list
 │   └── project-students.txt    # Students doing projects
-├── sankara.net/                # Project documentation website
+├── docs/                       # GitHub Pages site
+│   ├── index.html
+│   └── electives-allocation.html
+├── sankara.net/                # Original project website (archived)
 │   ├── electives-allocation.html
 │   └── pgsem/
 └── [other CGI scripts and utilities]
 ```
+
+## Documentation
+
+The allocation rules document is published via GitHub Pages at
+https://iimb-pgsem.github.io/electives/
 
 ## Branches
 
