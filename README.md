@@ -109,6 +109,12 @@ A student gets a course unless:
 Students can request to add, drop, or swap courses subject to capacity
 and schedule constraints.
 
+### Sample allocation output
+
+![Allocation spreadsheet](docs/images/allocation-internal.png)
+
+*A snapshot of the allocation engine's Excel output showing per-course student rankings, priorities, and allocation status (student names masked).*
+
 ## Data Formats
 
 All data files use semicolon-delimited fields. Lines starting with `#`
