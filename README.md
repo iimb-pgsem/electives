@@ -21,9 +21,10 @@ algorithm that considers seniority, course priority, and CGPA.
 
 This system was developed in 2006-2007 and used for quarterly elective
 allocation cycles starting Q4 2005-06 and continuing for a few years.
-The original version control was CVS; this repository was reconstructed
-from those CVS archives in 2026 with proper commit history, conventional
-commit messages, and PII removed.
+The codebase is ~5,200 SLOC of Perl across 21 files. The original
+version control was CVS; this repository was reconstructed from those
+CVS archives in 2026 with proper commit history, conventional commit
+messages, and PII removed.
 
 ## Authors
 
