@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml/badge.svg)](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml)
 ![Language](https://img.shields.io/badge/language-Perl-blue)
-![License](https://img.shields.io/badge/license-All%20rights%20reserved-lightgrey)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A course elective preference collection and allocation system built for
 the Post-Graduate Program in Software Enterprise Management (PGSEM) at
@@ -233,5 +233,4 @@ installed.
 
 ## License
 
-Copyright (c) 2006-2007 Sankaranarayanan Viswanathan and Abhay Ghaisas.
-All rights reserved.
+[MIT](LICENSE) — Copyright (c) 2006-2007 Sankaranarayanan Viswanathan and Abhay Ghaisas.
