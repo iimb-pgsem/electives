@@ -15,6 +15,8 @@ Students submit prioritized course preferences through a web interface.
 The allocation engine then assigns courses using a multi-factor ranking
 algorithm that considers seniority, course priority, and CGPA.
 
+**[Allocation Process and Rules](https://iimb-pgsem.github.io/electives/)** — the original instructions page explaining how the system works, with worked examples.
+
 ## History
 
 This system was developed in 2006-2007 and used for quarterly elective
@@ -266,8 +268,8 @@ On every push and pull request, CI runs three checks:
 
 ## Documentation
 
-The allocation rules document is published via GitHub Pages at
-https://iimb-pgsem.github.io/electives/
+The original allocation rules and instructions page is hosted via
+GitHub Pages at https://iimb-pgsem.github.io/electives/
 
 ## Branches
 
