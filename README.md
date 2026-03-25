@@ -17,11 +17,11 @@ algorithm that considers seniority, course priority, and CGPA.
 
 ## History
 
-This system was developed in 2006-2007 and used for multiple quarterly
-allocation cycles (Q4 2005 through Q4 2006). The original version
-control was CVS; this repository was reconstructed from those CVS
-archives in 2026 with proper commit history, conventional commit
-messages, and PII removed.
+This system was developed in 2006-2007 and used for quarterly elective
+allocation cycles starting Q4 2005-06 and continuing for a few years.
+The original version control was CVS; this repository was reconstructed
+from those CVS archives in 2026 with proper commit history, conventional
+commit messages, and PII removed.
 
 ## Authors
 
@@ -274,6 +274,13 @@ https://iimb-pgsem.github.io/electives/
 - **main**: Full CVS history (Jan 2006 – Mar 2007), 132 commits
 - **deployment-fork**: Fork from Aug 2006 adapted for Linux web hosting,
   adds `ConfigDir.pm`, `images.cgi`, `.htaccess`
+
+## Credits
+
+This work was supported by [Professor Rajendra K Bandi](https://digest.iimb.ac.in/2025/07/professor-rajendra-k-bandi/),
+ex PGSEM Chairperson at IIM Bangalore
+([LinkedIn](https://www.linkedin.com/in/rajendra-bandi-a8bb4/),
+[Chanakya University](https://chanakyauniversity.edu.in/faculties/dr-rajendra-bandi/)).
 
 ## License
 
