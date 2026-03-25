@@ -16,15 +16,17 @@ jobs:
       - name: Install Perl dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq cpanminus
-          sudo cpanm --notest Spreadsheet::WriteExcel
+          sudo apt-get install -y -qq cpanminus libdbi-perl
+          sudo cpanm --notest Spreadsheet::WriteExcel MIME::Lite
 
       - name: Syntax check all Perl files
         run: |
           errors=0
           for f in *.pl *.pm *.cgi; do
-            echo "Checking $f..."
-            if ! perl -I. -c "$f" 2>&1; then
+            echo -n "Checking $f... "
+            if perl -I. -c "$f" 2>&1; then
+              :
+            else
               errors=1
             fi
           done
