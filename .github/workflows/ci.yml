@@ -14,7 +14,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Perl dependencies
-        run: sudo cpanm --notest Spreadsheet::WriteExcel
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq cpanminus
+          sudo cpanm --notest Spreadsheet::WriteExcel
 
       - name: Syntax check all Perl files
         run: |
