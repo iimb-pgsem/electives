@@ -1,0 +1,33 @@
+# rollno; name; email; cgpa; credits; site
+#
+# Synthetic test data — no real student information.
+# Roll number format: YYYYNNN where YYYY=joining year, NNN=sequence
+
+# 2003 batch (senior — should get seniority priority, credits < 93)
+2003101; Arjun Kumar; arjun.k@test.example.com; 3.45; 84; B
+2003102; Priya Nair; priya.n@test.example.com; 3.12; 78; B
+2003103; Vikram Reddy; vikram.r@test.example.com; 2.95; 90; B
+2003104; Meera Sharma; meera.s@test.example.com; 3.67; 88; B
+2003105; Sunil Patel; sunil.p@test.example.com; 2.60; 72; B
+
+# 2004 batch (current — standard seniority)
+2004101; Deepa Iyer; deepa.i@test.example.com; 3.78; 54; B
+2004102; Ravi Menon; ravi.m@test.example.com; 3.22; 48; B
+2004103; Anita Bose; anita.b@test.example.com; 2.88; 60; B
+2004104; Karthik Rao; karthik.r@test.example.com; 3.55; 42; B
+2004105; Lakshmi Sundaram; lakshmi.s@test.example.com; 3.90; 36; B
+2004106; Naveen Gupta; naveen.g@test.example.com; 3.01; 48; B
+2004107; Shalini Verma; shalini.v@test.example.com; 2.70; 54; B
+2004108; Amit Deshpande; amit.d@test.example.com; 3.33; 42; B
+2004109; Padma Krishnan; padma.k@test.example.com; 3.15; 48; B
+2004110; Rahul Jain; rahul.j@test.example.com; 3.60; 36; B
+
+# 2005 batch (junior — lowest seniority)
+2005101; Divya Hegde; divya.h@test.example.com; 3.44; 18; B
+2005102; Ganesh Murthy; ganesh.m@test.example.com; 3.80; 12; B
+2005103; Sanjay Kulkarni; sanjay.k@test.example.com; 2.95; 18; B
+2005104; Revathi Narayan; revathi.n@test.example.com; 3.25; 24; B
+2005105; Mohan Das; mohan.d@test.example.com; 3.10; 18; B
+
+# 2003 batch student with >=93 credits (loses seniority)
+2003106; Ashok Mehta; ashok.m@test.example.com; 3.50; 96; B

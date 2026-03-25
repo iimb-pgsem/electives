@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Perl dependencies
+        run: sudo cpanm --notest Spreadsheet::WriteExcel
+
+      - name: Syntax check all Perl files
+        run: |
+          errors=0
+          for f in *.pl *.pm *.cgi; do
+            echo "Checking $f..."
+            if ! perl -I. -c "$f" 2>&1; then
+              errors=1
+            fi
+          done
+          exit $errors
+
+      - name: Run allocation engine with test fixtures
+        working-directory: test
+        run: PERL5LIB=.. perl ../elec.pl > output.txt 2>&1
+
+      - name: Verify allocation output
+        working-directory: test
+        run: |
+          echo "=== Checking output ==="
+
+          # All 21 students should appear in allocation
+          count=$(grep -c "^20[0-9]\{5\}$" output.txt)
+          echo "Students in ranklist: $count"
+          [ "$count" -eq 21 ] || { echo "FAIL: expected 21 students, got $count"; exit 1; }
+
+          # Allocation by course section should exist
+          grep -q "=== Allocation by course ===" output.txt || { echo "FAIL: no course allocation section"; exit 1; }
+
+          # Allocation by student section should exist
+          grep -q "=== Allocation by student ===" output.txt || { echo "FAIL: no student allocation section"; exit 1; }
+
+          # Verify seniority works: 2003 batch students should get their first-choice courses
+          grep -A1 "^2003104$" output.txt | grep -q "STRAT-B = Allotted" || { echo "FAIL: senior 2003104 didn't get STRAT"; exit 1; }
+          grep -A1 "^2003102$" output.txt | grep -q "FINM-B = Allotted" || { echo "FAIL: senior 2003102 didn't get FINM"; exit 1; }
+
+          # Verify schedule conflicts are detected
+          grep -q "SC:" output.txt || { echo "FAIL: no schedule conflicts detected"; exit 1; }
+
+          # Verify Excel workbook was generated
+          [ -f allocation.xls ] || { echo "FAIL: allocation.xls not generated"; exit 1; }
+
+          echo "All checks passed."
+
+      - name: Verify no PII in repository
+        run: |
+          echo "=== Scanning for PII patterns ==="
+          # Check for student email patterns from the original data
+          if grep -r "@iimb.ernet.in" --include="*.pl" --include="*.pm" --include="*.cgi" --include="*.txt" .; then
+            echo "FAIL: found IIMB email addresses in source files"
+            exit 1
+          fi
+
+          # Check for student data files that shouldn't exist
+          for f in students.txt project_students.txt; do
+            if [ -f "$f" ]; then
+              echo "FAIL: PII file $f exists in repo root"
+              exit 1
+            fi
+          done
+
+          echo "No PII found."

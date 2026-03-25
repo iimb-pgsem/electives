@@ -1,0 +1,237 @@
+# PGSEM Electives Allocation System
+
+[![CI](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml/badge.svg)](https://github.com/kvsankar/iimb-pgsem-electives/actions/workflows/ci.yml)
+![Language](https://img.shields.io/badge/language-Perl-blue)
+![License](https://img.shields.io/badge/license-All%20rights%20reserved-lightgrey)
+
+A course elective preference collection and allocation system built for
+the Post-Graduate Program in Software Enterprise Management (PGSEM) at
+the Indian Institute of Management, Bangalore (IIM-B).
+
+Students submit prioritized course preferences through a web interface.
+The allocation engine then assigns courses using a multi-factor ranking
+algorithm that considers seniority, course priority, and CGPA.
+
+## History
+
+This system was developed in 2006-2007 and used for multiple quarterly
+allocation cycles (Q4 2005 through Q4 2006). The original version
+control was CVS; this repository was reconstructed from those CVS
+archives in 2026 with proper commit history, conventional commit
+messages, and PII removed.
+
+## Authors
+
+- **Sankaranarayanan Viswanathan** ([@kvsankar](https://github.com/kvsankar))
+- **Abhay Ghaisas** ([@abhayghaisas](https://github.com/abhayghaisas))
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Web Interface                   │
+│  electives.cgi  summary.cgi  feedback.cgi  ...  │
+└──────────────────────┬──────────────────────────┘
+                       │ CGI / DBI
+              ┌────────┴────────┐
+              │   MySQL (pgsem) │
+              └────────┬────────┘
+                       │ reads choices from DB / files
+              ┌────────┴────────┐
+              │    elec.pl      │  ← allocation engine
+              │  (batch mode)   │
+              └────────┬────────┘
+                       │ reads
+    ┌──────────┬───────┴───────┬──────────────┐
+    │          │               │              │
+courses.txt  students.txt  choices.txt  project_students.txt
+```
+
+### Components
+
+| File | Purpose |
+|------|---------|
+| `elec.pl` | Core allocation engine — reads input files, runs the algorithm, writes results |
+| `electives.cgi` | Main CGI web app — student login, preference submission, results display |
+| `Elec.pm` | Shared module — data structures and loaders for courses, students, choices |
+| `ElecConfig.pm` | Configuration module — reads `config.txt` key-value pairs |
+| `ElecUtils.pm` | Utility functions — `err_print()`, `skip_line()` |
+| `summary.cgi` | Admin summary of submitted preferences by course |
+| `summarytext.cgi` | Plain-text variant of summary |
+| `feedback.cgi` | Student feedback collection |
+| `feedbackresults.cgi` | Display collected feedback |
+| `p3results.cgi` | Phase 3 allocation results display |
+| `passcode.cgi` | Generate and email login passcodes |
+| `dblog.cgi` | Admin view of database log entries |
+| `project.cgi` | Project assignment management |
+| `graduation.cgi` | Convocation/graduation candidate management |
+| `graduation-profiles.cgi` | Individual graduation profile display |
+| `mailresults.pl` | Email allocation results to students |
+| `sendmails.pl` | Bulk email sending utility |
+| `sendphaseonemails.pl` | Phase 1 opening notification emails |
+| `genstudents.pl` | Test data generator for student roll numbers |
+| `parselog.pl` | Log file parser |
+| `pgsem-schema.sql` | MySQL database schema (authcode, choices, changes, log) |
+
+## Allocation Algorithm
+
+The system uses a three-phase allocation process:
+
+### Phase 1: Demand Collection
+Students submit the number of courses they plan to take and a prioritized
+list of preferences (non-binding). This data is used to schedule classes
+and minimize conflicts.
+
+### Phase 2: Allocation (2A + 2B)
+Students submit binding preferences. The engine allocates courses based on:
+
+1. **Seniority** (`older_and_lazy_rule`): Earlier batch students who haven't
+   completed >=93 credits get priority. Students who missed Phase 1 or
+   Phase 2A lose seniority.
+2. **Course priority**: Within a seniority bucket, students who ranked a
+   course higher get priority.
+3. **CGPA**: Tie-breaker within the same seniority and priority level.
+4. **Roll number**: Final tie-breaker (lower roll number wins).
+
+A student gets a course unless:
+- They've been allocated all courses they requested
+- Their CGPA limits them (< 2.75 → max 3 courses; < 2.75 with project → max 2)
+- A higher-priority course was already allocated in the same time slot
+- The course reached its capacity cap
+
+### Phase 3: Add/Drop/Swap
+Students can request to add, drop, or swap courses subject to capacity
+and schedule constraints.
+
+## Data Formats
+
+All data files use semicolon-delimited fields. Lines starting with `#`
+are comments; blank lines are skipped.
+
+### courses.txt
+```
+# code; name; instructor; cap; slot; status; site; barred
+CS101; Data Structures; Prof. Sharma; 60; 1; A; B;
+FIN201; Corporate Finance; Prof. Rao; 50; 2; A; B+C;
+```
+- **status**: `A` (active), `D` (dropped), `N` (not available)
+- **site**: `B` (Bangalore), `C` (Chennai), `B+C` (distributed)
+- **barred**: year (e.g., `2005`) — batch barred from this course
+
+### students.txt
+```
+# rollno; name; email; cgpa; credits; site
+2004101; Student Name; student@example.com; 3.45; 72; B
+```
+
+### choices.txt
+```
+# rollno; ncourses; comma-separated-courses (priority order)
+2004101; 3; CS101,FIN201,MKT301
+```
+Note: the course list is **comma-separated** within the third semicolon-delimited field.
+
+### project_students.txt
+```
+# one roll number per line
+2004105
+2004110
+```
+
+### config.txt
+```
+phase=2
+adminpassword=changeme
+datasource=DBI:mysql:database=pgsem;host=localhost
+dblogin=pgsem
+dbpassword=changeme
+quarter_str=2006-07 Quarter 2 (September - November 2006)
+quarter_starts_str=Sep. 2006
+send_email=0
+pop_required=0
+deadline=2006-08-20
+moodle_url=http://localhost/moodle
+max_cgpa=4.0
+min_cgpa_four_courses=2.75
+min_credits=0
+credits_pass=93
+current_year=2004
+max_courses=4
+default_cap=65
+default_mincap=15
+default_status=A
+default_site=B
+default_cgpa=4.0
+give_priority_to_seniors=1
+give_priority_to_cgpa=1
+```
+
+## Running the Allocation Engine
+
+### Prerequisites
+- Perl 5.x with modules: `DBI`, `Spreadsheet::WriteExcel`, `POSIX`
+- MySQL (for the web interface; not required for batch allocation)
+
+### Batch allocation (no database required)
+
+```bash
+cd test/
+PERL5LIB=.. perl ../elec.pl
+```
+
+This reads from the current directory:
+- `config.txt` — allocation parameters
+- `courses-internal.txt` — course catalog (internal format with single-site rows)
+- `students.txt` — student roster
+- `choices.txt` — submitted preferences
+- `project-students.txt` — students doing projects
+- `choices-p1.txt` — Phase 1 participant roll numbers
+- `p2a-students.txt`, `p2-students.txt` — Phase 2 participant lists
+
+Output goes to stdout and `allocation-internal.txt`. An Excel workbook
+(`allocation.xls`) is also generated if `Spreadsheet::WriteExcel` is
+installed.
+
+### Web interface
+
+1. Create the MySQL database: `mysql < pgsem-schema.sql`
+2. Configure `config.txt` with database credentials
+3. Deploy CGI scripts to a web server with CGI support
+4. Access `electives.cgi` through the browser
+
+## Repository Structure
+
+```
+.
+├── Elec.pm                     # Core data module
+├── ElecConfig.pm               # Configuration reader
+├── ElecUtils.pm                # Utility functions
+├── elec.pl                     # Allocation engine (batch)
+├── electives.cgi               # Web interface (CGI)
+├── pgsem-schema.sql            # Database schema
+├── test/                       # Test fixtures (synthetic data, no PII)
+│   ├── config.txt              # Sample configuration
+│   ├── courses.txt             # Sample courses (display format)
+│   ├── courses-internal.txt    # Sample courses (allocation format)
+│   ├── students.txt            # 21 synthetic students across 3 batches
+│   ├── choices.txt             # Synthetic preferences
+│   ├── choices-p1.txt          # Phase 1 participant list
+│   ├── p2a-students.txt        # Phase 2A participant list
+│   ├── p2-students.txt         # Phase 2 participant list
+│   └── project-students.txt    # Students doing projects
+├── sankara.net/                # Project documentation website
+│   ├── electives-allocation.html
+│   └── pgsem/
+└── [other CGI scripts and utilities]
+```
+
+## Branches
+
+- **main**: Full CVS history (Jan 2006 – Mar 2007), 132 commits
+- **deployment-fork**: Fork from Aug 2006 adapted for Linux web hosting,
+  adds `ConfigDir.pm`, `images.cgi`, `.htaccess`
+
+## License
+
+Copyright (c) 2006-2007 Sankaranarayanan Viswanathan and Abhay Ghaisas.
+All rights reserved.

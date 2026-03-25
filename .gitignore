@@ -26,3 +26,8 @@ _$*
 *.ln
 core
 # CVS default ignores end
+
+# Allocation engine output
+allocation.xls
+allocation-internal.txt
+allocation-internal.xls

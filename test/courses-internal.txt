@@ -1,8 +1,5 @@
-# course code; course name; instructor; cap; slot; status; site; barred
-#
-# Slots: 1=Fri evening, 2=Sat morning, 3=Sat afternoon, 4=Sun morning
-# Status: A=Active, D=Dropped, N=Not available
-# Site: B=Bangalore, C=Chennai
+# Internal course data with single-site entries (one row per site)
+# code; name; instructor; cap; slot; status; site; barred
 
 STRAT; Strategy for Tech Companies; Prof. Anand; 30; 1; A; B;
 FINM; Financial Markets; Prof. Bhat; 25; 2; A; B;

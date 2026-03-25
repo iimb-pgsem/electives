@@ -1,0 +1,27 @@
+# PGSEM Electives Allocation - Test Configuration
+# This is a sample config for running the allocation engine in test mode.
+
+phase=2
+adminpassword=changeme
+datasource=DBI:mysql:database=pgsem_test;host=localhost
+dblogin=pgsem_test
+dbpassword=changeme
+quarter_str=2006-07 Quarter 2 (September - November 2006)
+quarter_starts_str=Sep. 2006
+send_email=0
+pop_required=0
+deadline=2006-09-15
+moodle_url=http://localhost/moodle
+max_cgpa=4.0
+min_cgpa_four_courses=2.75
+min_credits=0
+credits_pass=93
+current_year=2005
+max_courses=4
+default_cap=65
+default_mincap=15
+default_status=A
+default_site=B
+default_cgpa=4.0
+give_priority_to_seniors=1
+give_priority_to_cgpa=1
